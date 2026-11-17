@@ -1,0 +1,266 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-only
+set -e
+cd "$(dirname "$0")"
+
+# Two escape hatches for test builds (never used for committed builds):
+#   BUILD=/tmp/mwtest ./build.sh   -- put every artifact somewhere other
+#                                     than the git-tracked build/ dir
+#   THEME=dark ./build.sh                -- build with another look (kernel/ui/themes/<name>.h;
+#                                           default: classic, the original gray-on-cyan)
+#   EXTRA_CFLAGS="-DMW_..." ./build.sh -- extra compiler flags, e.g. the
+#                                     MW_AUTOTEST_* hooks in kernel.c (it goes
+#                                     through `eval`, so a string value is
+#                                     written -DNAME='\"text\"' with the
+#                                     backslashes)
+BUILD=${BUILD:-build}
+mkdir -p $BUILD
+
+echo "[1/5] Assembling bootloader (2 stages)..."
+# STAGE2_SECTORS is defined exactly once, here, and threaded into both
+# assembler invocations via -D -- boot.asm needs it to know how many
+# sectors to read stage 2 into, stage2.asm needs it to know where the
+# kernel starts (LBA 1 + STAGE2_SECTORS). One number, one place to
+# change it, instead of three hand-synchronized copies drifting apart
+# the next time either file's size budget needs to move.
+STAGE2_SECTORS=4   # 2KB -- stage2.asm currently assembles to well under
+                   # one sector; this leaves 3 sectors of headroom for
+                   # whatever grows there next (another VBE fallback
+                   # path, say) without needing to touch this number.
+nasm -f bin -DSTAGE2_SECTORS=$STAGE2_SECTORS boot/boot.asm -o $BUILD/boot.bin
+nasm -f bin -DSTAGE2_SECTORS=$STAGE2_SECTORS boot/stage2.asm -o $BUILD/stage2_raw.bin
+
+# The "boot the active partition" MBR that os-inst can write onto a blank disk, embedded into the kernel as a C array.
+nasm -f bin boot/chain_mbr.asm -o $BUILD/chain_mbr.bin
+python3 tools/gen_chain_mbr.py $BUILD/chain_mbr.bin kernel/chain_mbr.h
+
+STAGE2_ACTUAL_BYTES=$(stat -c%s "$BUILD/stage2_raw.bin")
+STAGE2_MAX_BYTES=$((STAGE2_SECTORS * 512))
+if [ "$STAGE2_ACTUAL_BYTES" -gt "$STAGE2_MAX_BYTES" ]; then
+    echo "ERROR: stage2.bin is $STAGE2_ACTUAL_BYTES bytes, exceeds the" \
+         "$STAGE2_MAX_BYTES-byte ($STAGE2_SECTORS-sector) budget stage 1" \
+         "reads it into (boot/boot.asm's disk read, sized by build.sh's" \
+         "STAGE2_SECTORS). Bump STAGE2_SECTORS in build.sh if stage2.asm" \
+         "needs to grow further."
+    exit 1
+fi
+# Pad stage2 out to a whole number of sectors -- boot.asm's disk read
+# always pulls exactly STAGE2_SECTORS sectors regardless of how much of
+# the last one stage2.asm's own code actually fills, so the image needs
+# that much real data there (zeros are fine; nothing ever executes past
+# stage2's own final instruction).
+python3 -c "
+import sys
+with open('$BUILD/stage2_raw.bin', 'rb') as f:
+    data = f.read()
+target = $STAGE2_MAX_BYTES
+data = data + b'\x00' * (target - len(data))
+with open('$BUILD/stage2.bin', 'wb') as f:
+    f.write(data)
+"
+echo "  stage2: $STAGE2_ACTUAL_BYTES / $STAGE2_MAX_BYTES bytes" \
+     "($STAGE2_SECTORS-sector budget)"
+
+echo "[2/5] Assembling kernel entry stub..."
+nasm -f elf32 kernel/kentry.asm -o $BUILD/kentry.o
+
+THEME_FLAG="-DMW_THEME_FILE=\\\"ui/themes/${THEME:-classic}.h\\\""   # (the compile line below goes through eval, which eats one level of quotes)
+[ -f "kernel/ui/themes/${THEME:-classic}.h" ] || { echo "ERROR: no such theme: kernel/ui/themes/${THEME:-classic}.h"; exit 1; }
+echo "[2b] Building the classic-program runtime (kernel/compat_rt.c: programs built before ring 3 run in ring 3 through it)..."
+gcc -m32 -ffreestanding -fno-pie -fno-stack-protector -nostdlib -nostdinc -Os -fno-asynchronous-unwind-tables -ffunction-sections -fdata-sections \
+    -Isdk/include -c kernel/compat_rt.c -o $BUILD/compat_rt.o || exit 1
+ld -m elf_i386 -T kernel/compat_link.ld --gc-sections -o $BUILD/compat_rt.elf $BUILD/compat_rt.o || exit 1
+objcopy -O binary $BUILD/compat_rt.elf $BUILD/compat_rt.bin
+python3 tools/gen_compat_rt.py $BUILD/compat_rt.elf $BUILD/compat_rt.bin kernel/compat_rt_blob.h || exit 1
+echo "[3/5] Compiling C kernel..."
+# -Os over -O1: this kernel's bottleneck has never been CPU cycles (it's
+# a GUI polling a mouse a few thousand times a second, not folding
+# proteins) -- it's the 512-byte-sector boot budget. -Os asks the
+# compiler to optimize for exactly that trade. -ffunction-sections and
+# -fdata-sections split every function and global into its own linker
+# section so the --gc-sections pass below can actually find and discard
+# the ones nothing calls (see the comment in kernel/link.ld for why the
+# wildcard patterns there matter just as much as these two flags do).
+# -mpreferred-stack-boundary=2: gcc's i386 default keeps the stack 16-byte aligned for SSE, which this kernel never
+# uses (no xmm/movaps anywhere in kernel.o), and pays for with padding before and after nearly every call. 4-byte
+# alignment is what the i386 ABI actually requires (the Linux i386 kernel is built the same way) and shrinks the image
+# by about 6 KB -- room the boot budget (512 KB, 4 KB page granularity before .data) no longer had.
+eval gcc -m32 -ffreestanding -fno-pie -fno-stack-protector -nostdlib -nostdinc -mpreferred-stack-boundary=2 \
+    -Wall -Wextra -Os -Ikernel -ffunction-sections -fdata-sections $THEME_FLAG $EXTRA_CFLAGS -c kernel/kernel.c -o $BUILD/kernel.o
+
+echo "[4/5] Linking kernel..."
+ld -m elf_i386 -T kernel/link.ld -nostdlib --gc-sections \
+    -o $BUILD/kernel.elf $BUILD/kentry.o $BUILD/kernel.o
+objcopy -O binary $BUILD/kernel.elf $BUILD/kernel.bin
+python3 tools/pack_kernel.py $BUILD/kernel.bin $BUILD/kernel.packed      # what goes on the disk: boot/stage2.asm unpacks it to 0x900000
+
+# The kernel's .bss (all its uninitialized globals -- the NIC ring
+# buffers, the framebuffer backbuffer, the network stack's tables, all
+# of it) grows upward from wherever .data ends. The bootloader's stack
+# starts at a fixed address and grows *downward* from there. Nothing
+# stops these two from silently overlapping as .bss grows across
+# sessions of adding features -- the linker has no idea a stack even
+# exists, it happily lets .bss claim any address it wants. When they do
+# overlap, the very first deep-ish function call scribbles over whatever
+# global happened to land at the top of .bss, which is exactly the kind
+# of "works nine times out of ten, then DHCP just stops replying for no
+# visible reason" bug this check exists to catch before it ships instead
+# of during a late-night debugging session.
+echo "[4.5/5] Checking the kernel (code + data + .bss) fits its region..."
+# 1.1-alpha-14: the kernel runs at MW_KERNEL_BASE (0x900000) and may use everything up to MW_KERNEL_END, where the memory manager's heap begins
+# (kernel/memmap.h; mm.h's MW_MM_FIRST_ADDR is the same address). Its stack is elsewhere (MW_STACK_TOP), so this is the only collision left to catch.
+KERNEL_END=$(grep -oP '#define\s+MW_KERNEL_END\s+\K0x[0-9A-Fa-f]+' kernel/memmap.h)
+KERNEL_BASE_LD=$(grep -oP '\.\s*=\s*\K0x[0-9A-Fa-f]+' kernel/link.ld | head -1)
+KERNEL_BASE_H=$(grep -oP '#define\s+MW_KERNEL_BASE\s+\K0x[0-9A-Fa-f]+' kernel/memmap.h)
+MM_FIRST=$(grep -oP '#define\s+MW_MM_FIRST_ADDR\s+\K0x[0-9A-Fa-f]+' kernel/mm.h)
+STAGE_RUN=$(grep -oP 'KERNEL_RUN_ADDR\s+equ\s+\K0x[0-9A-Fa-f]+' boot/stage2.asm)
+BSS_VMA_HEX=$(objdump -h $BUILD/kernel.elf | awk '/\.bss/ { print "0x" $4 }')
+BSS_SIZE_HEX=$(objdump -h $BUILD/kernel.elf | awk '/\.bss/ { print "0x" $3 }')
+python3 - "$KERNEL_BASE_LD" "$KERNEL_BASE_H" "$STAGE_RUN" "$KERNEL_END" "$MM_FIRST" "$BSS_VMA_HEX" "$BSS_SIZE_HEX" <<'EOF'
+import sys
+ld, mh, st, end, mm, vma, size = [int(a, 16) for a in sys.argv[1:8]]
+if not (ld == mh == st):
+    print(f"ERROR: the kernel's address is not the same everywhere: link.ld 0x{ld:X}, memmap.h MW_KERNEL_BASE 0x{mh:X}, boot/stage2.asm KERNEL_RUN_ADDR 0x{st:X}"); sys.exit(1)
+if mm != end:
+    print(f"ERROR: mm.h's MW_MM_FIRST_ADDR (0x{mm:X}) must be memmap.h's MW_KERNEL_END (0x{end:X}): the heap would overlap the kernel or leave a hole"); sys.exit(1)
+bss_end = vma + size
+print(f"  kernel region 0x{ld:06X} - 0x{end:06X}; .bss spans 0x{vma:06X} - 0x{bss_end:06X} ({size} bytes)")
+if bss_end > end:
+    print(f"ERROR: the kernel (with .bss) ends {bss_end - end} bytes past MW_KERNEL_END. Raise MW_KERNEL_END and MW_MM_FIRST_ADDR (and the RAM the loader insists on: stage2.asm KERNEL_MIN_KB), or shrink the kernel."); sys.exit(1)
+print(f"  OK -- {end - bss_end} bytes of headroom in the kernel region")
+EOF
+
+echo "[5/5] Building final disk image..."
+# Every number below is *read out of* boot/boot.asm and kernel/fs.h
+# rather than copy-pasted as a second hardcoded copy -- three
+# independent magic numbers that all have to agree (the bootloader's
+# read budget, this build script's size check, and where fs.h starts
+# carving out file slots) is exactly how a layout quietly drifts out of
+# sync the next time just one of them gets edited. Deriving them here
+# means changing KERNEL_CHUNKS in boot.asm is the *only* edit needed to
+# resize the kernel's budget -- this script and fs.h's own comments
+# follow along automatically (fs.h's FS_BASE_LBA constant itself still
+# has to be hand-updated to match, since C headers can't ask the
+# assembler a question at compile time -- but this check at least
+# catches it immediately if that update is forgotten).
+KERNEL_CHUNKS=$(grep -oP 'KERNEL_CHUNKS\s+equ\s+\K[0-9]+' boot/stage2.asm)
+SECTORS_PER_CHUNK=$(grep -oP 'KERNEL_SECTORS_PER_CHUNK\s+equ\s+\K[0-9]+' boot/stage2.asm)
+KERNEL_BUDGET_SECTORS=$((KERNEL_CHUNKS * SECTORS_PER_CHUNK))
+KERNEL_MAX_BYTES=$((KERNEL_BUDGET_SECTORS * 512))
+KERNEL_ACTUAL_BYTES=$(stat -c%s "$BUILD/kernel.packed")      # the PACKED kernel is what the disk region holds
+
+# Bootloader is now 2 stages: stage 1 is exactly 1 sector (512 bytes,
+# LBA 0), stage 2 occupies STAGE2_SECTORS sectors right after it
+# (LBA 1..STAGE2_SECTORS), and the kernel follows for
+# KERNEL_BUDGET_SECTORS sectors after THAT -- if kernel.bin is ever
+# bigger than that budget, it would get silently truncated on boot, so
+# fail the build loudly instead of shipping something broken.
+if [ "$KERNEL_ACTUAL_BYTES" -gt "$KERNEL_MAX_BYTES" ]; then
+    echo "ERROR: the packed kernel is $KERNEL_ACTUAL_BYTES bytes, exceeds the" \
+         "$KERNEL_MAX_BYTES-byte ($KERNEL_BUDGET_SECTORS-sector) budget the" \
+         "bootloader reads (KERNEL_CHUNKS=$KERNEL_CHUNKS x" \
+         "KERNEL_SECTORS_PER_CHUNK=$SECTORS_PER_CHUNK in boot/stage2.asm)." \
+         "Increase KERNEL_CHUNKS there -- and update FS_BASE_LBA in" \
+         "kernel/fs.h to start immediately after the new budget -- if the" \
+         "kernel needs to grow further."
+    exit 1
+fi
+echo "  kernel: $(stat -c%s $BUILD/kernel.bin) bytes unpacked, $KERNEL_ACTUAL_BYTES / $KERNEL_MAX_BYTES bytes packed" \
+     "($KERNEL_BUDGET_SECTORS-sector budget)"
+
+# The layout, read out of kernel/fs.h so there is one copy of every number (see fs.h's layout map):
+#   kernel -> icon catalog -> root volume, back to back, ending exactly at the image size.
+ICON_BASE_LBA=$(grep -oP '#define\s+ICON_BASE_LBA\s+\K[0-9]+' kernel/fs.h)
+ICON_SLOT_SECTORS=$(grep -oP '#define\s+ICON_SLOT_SECTORS\s+\K[0-9]+' kernel/fs.h)
+ICON_MAX_SLOTS=$(grep -oP '#define\s+ICON_MAX_SLOTS\s+\K[0-9]+' kernel/fs.h)
+MW_FONT_LBA=$(grep -oP '#define\s+MW_FONT_LBA\s+\K[0-9]+' kernel/fs.h)
+MW_FONT_SECTORS=$(grep -oP '#define\s+MW_FONT_SECTORS\s+\K[0-9]+' kernel/fs.h)
+MW_ROOTFS_LBA=$(grep -oP '#define\s+MW_ROOTFS_LBA\s+\K[0-9]+' kernel/fs.h)
+MW_ROOTFS_STOCK_SECTORS=$(grep -oP '#define\s+MW_ROOTFS_STOCK_SECTORS\s+\K[0-9]+' kernel/fs.h)
+ICON_TOTAL_SECTORS=$((ICON_MAX_SLOTS * ICON_SLOT_SECTORS))
+
+KERNEL_START_LBA=$((1 + STAGE2_SECTORS))
+EXPECTED_ICON_BASE_LBA=$((KERNEL_START_LBA + KERNEL_BUDGET_SECTORS))
+if [ "$ICON_BASE_LBA" -lt "$EXPECTED_ICON_BASE_LBA" ]; then
+    echo "ERROR: kernel/fs.h's ICON_BASE_LBA ($ICON_BASE_LBA) starts before the kernel's own budget ends" \
+         "(LBA $EXPECTED_ICON_BASE_LBA) -- the kernel would silently overwrite the icon catalog on disk." \
+         "Update ICON_BASE_LBA (and MW_ROOTFS_LBA) in kernel/fs.h."
+    exit 1
+fi
+echo "  icon catalog: LBA $ICON_BASE_LBA-$((ICON_BASE_LBA + ICON_TOTAL_SECTORS - 1)) ($ICON_MAX_SLOTS slots x $ICON_SLOT_SECTORS sectors)"
+if [ "$MW_FONT_LBA" -ne $((ICON_BASE_LBA + ICON_TOTAL_SECTORS)) ] || [ "$MW_ROOTFS_LBA" -ne $((MW_FONT_LBA + MW_FONT_SECTORS)) ]; then
+    echo "ERROR: kernel/fs.h's layout is not back to back: icon catalog ends at LBA $((ICON_BASE_LBA + ICON_TOTAL_SECTORS - 1)), the font pack must start at $((ICON_BASE_LBA + ICON_TOTAL_SECTORS)) (MW_FONT_LBA=$MW_FONT_LBA) and end where the root volume starts (MW_FONT_LBA + MW_FONT_SECTORS = $((MW_FONT_LBA + MW_FONT_SECTORS)), MW_ROOTFS_LBA=$MW_ROOTFS_LBA)."
+    exit 1
+fi
+ST_INSTALL_SECTORS=$(grep -oP '#define\s+ST_INSTALL_SECTORS\s+\K[0-9]+' kernel/storage.h)
+if [ "$ST_INSTALL_SECTORS" -ne $((MW_ROOTFS_LBA + MW_ROOTFS_STOCK_SECTORS)) ]; then
+    echo "ERROR: kernel/storage.h's ST_INSTALL_SECTORS ($ST_INSTALL_SECTORS) is not MW_ROOTFS_LBA + MW_ROOTFS_STOCK_SECTORS ($((MW_ROOTFS_LBA + MW_ROOTFS_STOCK_SECTORS)))."
+    exit 1
+fi
+if [ "$MW_ROOTFS_LBA" -lt $((ICON_BASE_LBA + ICON_TOTAL_SECTORS)) ]; then
+    echo "ERROR: MW_ROOTFS_LBA ($MW_ROOTFS_LBA) is inside the icon catalog (ends at LBA $((ICON_BASE_LBA + ICON_TOTAL_SECTORS - 1)))."
+    exit 1
+fi
+MIN_IMAGE_SECTORS=$((MW_ROOTFS_LBA + MW_ROOTFS_STOCK_SECTORS))
+echo "  root volume: LBA $MW_ROOTFS_LBA-$((MIN_IMAGE_SECTORS - 1)) ($MW_ROOTFS_STOCK_SECTORS sectors, MWFS)"
+echo "  minimum sectors needed: $MIN_IMAGE_SECTORS ($(( MIN_IMAGE_SECTORS * 512 / 1024 ))KB)"
+
+cp $BUILD/boot.bin $BUILD/os-image.img
+cat $BUILD/stage2.bin >> $BUILD/os-image.img
+cat $BUILD/kernel.packed >> $BUILD/os-image.img
+
+# Final image size: a round 1024KB / 1MB (2048 sectors), not whatever
+# number happened to be left over after the last feature was added.
+# Rounding up to a clean, human-friendly size (256KB/512KB/768KB/1024KB,
+# the same handful of sizes disk tools, flashers, and humans all expect)
+# instead of an arbitrary "1700 sectors, for headroom" is worth the
+# trade even though it means picking a target instead of just measuring
+# one -- an odd size like 833536 bytes signals nothing about intent,
+# while a round number reads immediately as "yes, this was chosen."
+# Bumped 256KB->512KB once the kernel's 11x11 Galmuri11 bitmap fonts
+# (see kernel/font_latin_data.h, kernel/font_ko_data.h) pushed the
+# kernel itself past its old budget, 512KB->768KB once
+# kernel/mwp.h's loadable-program slots needed a home of their own, and
+# 768KB->1024KB once a real (non-hand-drawn) icon bitmap catalog (see
+# kernel/fs.h's icon-catalog section) needed one too -- see
+# boot/stage2.asm's KERNEL_CHUNKS and kernel/fs.h's layout comment for
+# the matching numbers. The check below still fails loudly if the real
+# minimum ever grows past whichever round number is targeted, instead of
+# silently truncating something.
+TARGET_TOTAL_BYTES=$((MIN_IMAGE_SECTORS * 512))        # (1.1-alpha-14: the image is as big as its layout: 2688 sectors = 1344 KB)
+TARGET_TOTAL_SECTORS=$((TARGET_TOTAL_BYTES / 512))
+if [ "$MIN_IMAGE_SECTORS" -ne "$TARGET_TOTAL_SECTORS" ]; then
+    echo "ERROR: the kernel + file-slot layout now needs" \
+         "$MIN_IMAGE_SECTORS sectors, but the image is $TARGET_TOTAL_SECTORS" \
+         "(${TARGET_TOTAL_BYTES} bytes): the root volume must end exactly at the end of the image." \
+         "Adjust MW_ROOTFS_STOCK_SECTORS in kernel/fs.h (or TARGET_TOTAL_BYTES here)."
+    exit 1
+fi
+
+python3 - "$TARGET_TOTAL_BYTES" "$BUILD/os-image.img" <<'EOF'
+import os, sys
+path = sys.argv[2]
+target = int(sys.argv[1])
+size = os.path.getsize(path)
+if size < target:
+    with open(path, "ab") as f:
+        f.write(b"\x00" * (target - size))
+elif size > target:
+    # Shouldn't happen given the sector check above, but truncating
+    # instead of silently shipping an oversized image is the safer
+    # failure mode if it ever does.
+    with open(path, "r+b") as f:
+        f.truncate(target)
+print(f"Final image size: {os.path.getsize(path)} bytes")
+EOF
+
+# The stock image's root filesystem: a fresh MWFS over the tail of the image (tools/mwfs.py is the offline twin of
+# kernel/mwfs.h). Programs are installed into it afterwards by tools/install_mwp.py.
+python3 tools/mwfs.py format "$BUILD/os-image.img" --lba "$MW_ROOTFS_LBA" --sectors "$MW_ROOTFS_STOCK_SECTORS" --label MINIWIN
+
+# The font pack: the MINIMAL one (Galmuri11 only) -- without it the Hangul table is missing, the kernel no longer carries it.
+# tools/install_all.sh puts the full pack into the image it hands out (the floppy copy keeps this one).
+python3 tools/install_fontpack.py "$BUILD/os-image.img" third_party/galmuri-font/fontpack-min.bin
+
+echo "Build complete: $BUILD/os-image.img"
+ls -la $BUILD/os-image.img

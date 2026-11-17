@@ -1,0 +1,220 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+#ifndef RTL8139_H
+#define RTL8139_H
+#include "io.h"
+#include "memmap.h"
+#include "pci.h"
+#include "serial.h"
+#include "nic.h"
+
+/* ============================================================
+ * Realtek RTL8139 driver -- the single most-documented, most-cloned
+ * NIC in hobby-OS history, and for good reason: it's entirely
+ * port-I/O-addressed (no MMIO, no BAR mapping headaches), the receive
+ * path is one contiguous ring buffer the card DMAs into on its own, and
+ * transmit is four fire-and-forget descriptor slots. No interrupts are
+ * used here -- everything is polled from the kernel's existing main
+ * loop, same as the mouse and keyboard already are.
+ * ============================================================ */
+
+#define RTL_VENDOR_ID 0x10EC
+#define RTL_DEVICE_ID 0x8139
+
+/* Register offsets from the I/O base (BAR0 with the low "I/O space" bit
+ * masked off). */
+#define RTL_IDR0     0x00   /* MAC address, 6 bytes */
+#define RTL_TSD0     0x10   /* transmit status, descriptor 0 (TSD1-3 follow, 4 bytes apart) */
+#define RTL_TSAD0    0x20   /* transmit start address, descriptor 0 (physical) */
+#define RTL_RBSTART  0x30   /* receive ring buffer start address (physical) */
+#define RTL_CR       0x37   /* command register */
+#define RTL_CAPR     0x38   /* current address of packet read (software's RX pointer, minus 0x10 fudge) */
+#define RTL_IMR      0x3C   /* interrupt mask -- left mostly zeroed, we poll instead */
+#define RTL_ISR      0x3E   /* interrupt status -- also used for polling: bits latch even with IMR=0 */
+#define RTL_TCR      0x40
+#define RTL_RCR      0x44
+#define RTL_CONFIG1  0x52
+
+#define RTL_CR_RST   0x10
+#define RTL_CR_RE    0x08
+#define RTL_CR_TE    0x04
+#define RTL_CR_BUFE  0x01   /* RX buffer empty */
+
+#define RTL_ISR_ROK  0x0001
+#define RTL_ISR_TOK  0x0004
+
+/* The receive ring. The chip's ring size is chosen by RCR bits 12:11 (RBLEN): 00 = 8KB, 01 = 16KB,
+ * 10 = 32KB, 11 = 64KB, each "+16 bytes". We use 32KB, for two reasons:
+ *   1. Burst absorption. A server answers a request with a whole TCP window of back-to-back full-size
+ *      frames, and this driver is polled once per main-loop pass, which can be tens of milliseconds
+ *      apart. An 8KB ring holds about FIVE full frames -- the rest of a 10-segment burst fell off the
+ *      end. 32KB holds everything we allow in flight (tcp.h caps the advertised window at 20KB, which
+ *      is about 15 full frames = ~22KB on the wire).
+ *   2. NOT 64KB: with the WRAP bit set, a frame that STARTS inside the ring is written contiguously
+ *      past the ring's end (that is what lets software read it in one piece). QEMU's emulation -- and
+ *      the chip's documentation is vague on this -- does NOT do that in 64KB mode: it splits the frame
+ *      at the end of the ring instead. A first version of this driver used 64KB and quietly corrupted
+ *      the first frame to straddle the end (seen as a TLS record failing authentication ~64KB into a
+ *      download). 32KB is Linux's default and works everywhere.
+ * RTL_RING_SIZE is where the CARD wraps its write pointer; the buffer is longer than that
+ * (RTL_RX_BUF_LEN) to hold the contiguous overrun of one maximum-size frame. */
+#define RTL_RING_SIZE   32768u
+#define RTL_RX_BUF_LEN  (RTL_RING_SIZE + 16 + 1536)
+/* Buffers live in the net arena (kernel/memmap.h) -- see e1000.h for why. */
+#define rtl_rx_buf ((u8 *)MW_RTL_RX_ADDR)
+typedef char rtl_assert_rx_fits[(RTL_RX_BUF_LEN <= MW_RTL_RX_SIZE) ? 1 : -1];
+
+#define RTL_TX_SLOTS 4
+#define RTL_TX_BUF_LEN 1536
+typedef u8 rtl_tx_row_t[RTL_TX_BUF_LEN];
+#define rtl_tx_buf ((rtl_tx_row_t *)MW_RTL_TX_ADDR)
+typedef char rtl_assert_tx_fits[(RTL_TX_SLOTS * RTL_TX_BUF_LEN <= MW_RTL_TX_SIZE) ? 1 : -1];
+
+static u16 rtl_io_base;
+static u32 rtl_rx_offset;     /* our software read pointer into rtl_rx_buf */
+static int rtl_tx_next;       /* which of the 4 TX slots to use next, round-robin */
+
+static int rtl8139_send(const u8 *frame, u16 len) {
+    if (len > RTL_TX_BUF_LEN) return 0; /* not going to fragment; caller's problem */
+
+    int slot = rtl_tx_next;
+    rtl_tx_next = (rtl_tx_next + 1) % RTL_TX_SLOTS;
+
+    /* Ethernet has a 60-byte minimum frame length (64 with the 4-byte
+     * FCS the hardware appends); pad short frames with zeros so the
+     * card doesn't reject them. */
+    u8 *buf = rtl_tx_buf[slot];
+    for (u16 i = 0; i < len; i++) buf[i] = frame[i];
+    u16 tx_len = len;
+    while (tx_len < 60) buf[tx_len++] = 0;
+
+    outl(rtl_io_base + RTL_TSAD0 + (u16)(slot * 4), (u32)(u32)buf);
+    /* Writing the length to TSD also kicks off transmission. Bits 0-12
+     * are the length; that's all we need to set. */
+    outl(rtl_io_base + RTL_TSD0 + (u16)(slot * 4), tx_len);
+
+    /* Poll (briefly, bounded) for TOK on this descriptor so a caller
+     * doing several sends in a row doesn't outrun the hardware and
+     * stomp a slot that's still in flight. This is a busy-wait like
+     * everything else in this kernel, not a real timeout in seconds. */
+    u32 tsd = 0;
+    for (u32 i = 0; i < 200000; i++) {
+        tsd = inl(rtl_io_base + RTL_TSD0 + (u16)(slot * 4));
+        if (tsd & 0x8000) return 1;                     /* TOK: the card says it went out */
+        if (tsd & 0x40000000u) break;                   /* TABT: transmit aborted, no point waiting */
+    }
+    /* No TOK: the frame did NOT (verifiably) leave. This used to fall out of the loop and return 1
+     * anyway, so TCP booked a lost segment as sent. Report the failure; the slot is simply rewritten
+     * from scratch the next time the round-robin comes back to it (TSAD+TSD are set per send). */
+    serial_puts("[RTL8139] TX not completed, frame reported as failed\n");
+    return 0;
+}
+
+/* Puts the receiver back into a known state: ring empty, both pointers at the start. Used when the
+ * card reports an overflow or the ring contents stop making sense -- the alternative is a NIC that
+ * quietly stops delivering packets, which is exactly what a desynced ring looks like from above. */
+static void rtl8139_reset_rx(void) {
+    outb(rtl_io_base + RTL_CR, RTL_CR_TE);                        /* receiver off (transmitter stays on) */
+    rtl_rx_offset = 0;
+    outl(rtl_io_base + RTL_RBSTART, (u32)(u32)rtl_rx_buf);
+    outw(rtl_io_base + RTL_CAPR, (u16)(0 - 16));                  /* read pointer = 0, minus the usual 16 */
+    outl(rtl_io_base + RTL_RCR, 0x0000000F | (1u << 7) | (2u << 11));   /* AB|AM|APM|WRAP, 32KB ring */
+    outb(rtl_io_base + RTL_CR, RTL_CR_RE | RTL_CR_TE);
+}
+
+static int rtl8139_recv(u8 *out, u16 max_len, u16 *out_len) {
+    /* Overflow bits in the (latching) interrupt status: RXOVW (0x10) = ring full, FOVW (0x40) = FIFO
+     * overflow. Either way frames were lost AND the card may have stopped; reset the ring. */
+    u16 isr = inw(rtl_io_base + RTL_ISR);
+    if (isr & 0x0050) {
+        outw(rtl_io_base + RTL_ISR, (u16)(isr & 0x0050));
+        serial_puts("[RTL8139] rx overflow -- resetting ring\n");
+        rtl8139_reset_rx();
+        return 0;
+    }
+    if (inb(rtl_io_base + RTL_CR) & RTL_CR_BUFE) return 0; /* ring is empty */
+
+    /* Each received frame is prefixed by the card with a 4-byte header:
+     * u16 status, u16 length (length includes the 4-byte FCS, which we
+     * don't want to hand upward). */
+    u8 *hdr = rtl_rx_buf + rtl_rx_offset;
+    u16 status = (u16)(hdr[0] | (hdr[1] << 8));
+    u16 frame_len = (u16)(hdr[2] | (hdr[3] << 8));
+
+    if (!(status & RTL_ISR_ROK) || frame_len < 4 || frame_len > 1518) {
+        /* The ring no longer makes sense (software and card pointers disagree). Trusting garbage and
+         * walking off into the weeds is the one thing not to do; the old driver returned "nothing"
+         * and left the pointer alone, which just meant it stayed wedged forever. Reset instead. */
+        serial_puts("[RTL8139] rx ring desync -- resetting\n");
+        rtl8139_reset_rx();
+        return 0;
+    }
+
+    u16 payload_len = (u16)(frame_len - 4); /* drop the FCS */
+    u16 copy_len = (payload_len < max_len) ? payload_len : max_len;
+    /* contiguous: with the WRAP bit set the card never splits a frame across the ring's end */
+    for (u16 i = 0; i < copy_len; i++) out[i] = hdr[4 + i];
+    *out_len = copy_len;
+
+    /* Advance past this frame (header + data), round up to a 4-byte boundary (the card does the same
+     * internally), and wrap AT THE RING SIZE -- not at the buffer size. (Wrapping at the longer buffer
+     * length was this driver's original bug: after the first frame that ran past the end, the
+     * software pointer and the card's pointer disagreed for good.) */
+    u32 next = rtl_rx_offset + 4 + frame_len;
+    next = (next + 3) & ~((u32)3);
+    next &= (RTL_RING_SIZE - 1);
+    rtl_rx_offset = next;
+
+    /* CAPR wants "read pointer minus 16 bytes" by convention (a quirk of this exact chip). */
+    outw(rtl_io_base + RTL_CAPR, (u16)(rtl_rx_offset - 16));
+    return 1;
+}
+
+static int rtl8139_init(void) {
+    pci_device_t *dev = pci_find_device(RTL_VENDOR_ID, RTL_DEVICE_ID);
+    if (!dev) return 0;
+
+    pci_enable_bus_mastering(dev->bus, dev->slot, dev->func);
+
+    if (!(dev->bar0 & 0x1)) {
+        serial_puts("[RTL8139] BAR0 is not I/O-mapped, giving up\n");
+        return 0;
+    }
+    rtl_io_base = (u16)(dev->bar0 & 0xFFFC);
+
+    outb(rtl_io_base + RTL_CONFIG1, 0x00); /* power on */
+
+    outb(rtl_io_base + RTL_CR, RTL_CR_RST); /* software reset */
+    for (u32 i = 0; i < 1000000; i++) {
+        if (!(inb(rtl_io_base + RTL_CR) & RTL_CR_RST)) break;
+    }
+
+    rtl_rx_offset = 0;
+    rtl_tx_next = 0;
+    outl(rtl_io_base + RTL_RBSTART, (u32)(u32)rtl_rx_buf);
+
+    outw(rtl_io_base + RTL_IMR, 0x0000); /* polled, not interrupt-driven */
+
+    /* AB (accept broadcast) | AM (accept multicast) | APM (accept our own
+     * unicast) | WRAP -- the standard "just give me everything sane"
+     * config used by essentially every hobby driver for this chip. */
+    outl(rtl_io_base + RTL_RCR, 0x0000000F | (1u << 7) | (2u << 11));   /* ... and a 32KB receive ring */
+
+    outb(rtl_io_base + RTL_CR, RTL_CR_RE | RTL_CR_TE);
+
+    for (int i = 0; i < 6; i++) nic.mac[i] = inb(rtl_io_base + RTL_IDR0 + i);
+
+    nic.present = 1;
+    nic.chip_name = "RTL8139";
+    nic.send = rtl8139_send;
+    nic.recv = rtl8139_recv;
+
+    serial_puts("[RTL8139] initialized, MAC=");
+    for (int i = 0; i < 6; i++) {
+        serial_put_hex8(nic.mac[i]);
+        if (i < 5) serial_putc(':');
+    }
+    serial_putc('\n');
+    return 1;
+}
+
+#endif

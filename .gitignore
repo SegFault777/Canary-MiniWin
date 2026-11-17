@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+# build outputs are NOT tracked: each version's image is attached to its GitHub Release instead
+build/
+# my own hand-over notes for the next session: never part of the repository
+HANDOVER*.md
+kernel/compat_rt_blob.h

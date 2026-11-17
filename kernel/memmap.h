@@ -1,0 +1,204 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+#ifndef MEMMAP_H
+#define MEMMAP_H
+#include "io.h"
+
+/* ============================================================
+ * memmap.h -- the ONE place that decides who owns which chunk of
+ * physical memory above 1MB. Paging is off in this kernel, so a raw
+ * physical address IS a pointer (the same trick vga.h already uses for
+ * the LFB and the truecolor backbuffer at 0x400000).
+ *
+ *   0x000000 - 0x0FFFFF   real-mode leftovers; the PACKED kernel is staged at 0x10000 by the boot loader (the kernel itself runs at 0x900000)
+ *                         + .bss (see build.sh's ceiling check: .bss must
+ *                         stay under 0x9FC00 or it walks into the EBDA/VGA
+ *                         window)
+ *   0x100000 - 0x17FFFF   the kernel STACK (512KB, grows DOWN from 0x180000)
+ *   0x180000 - 0x3FFFFF   the NET ARENA (2.5MB) -- every big network buffer,
+ *                         including the NICs' DMA buffers (the card's bus-master
+ *                         DMA works on any physical address, and .bss was out of room)
+ *   0x38F000 - 0x38FFFF   vga.h's 256-colour lookup table (4 KB; only used in a 256-colour mode)
+ *   0x390000 - 0x52FFFF   vga.h's backbuffer: the LARGEST screen (854*480*4 = 0x190800) at its start (alpha-14; it used to sit at 0x400000, 640*480*4)
+ *
+ * WHY THE STACK MOVED: it used to start at 0x9FC00 (the top of
+ * conventional memory) and grow down towards a .bss that ends at
+ * ~0x9B318 -- an 18KB gap. Meanwhile tls_write_record() alone wants
+ * 33KB of locals, gcm_decrypt() 16KB, and elliptic-curve math wants
+ * more still. That was a stack overflow waiting to happen, quietly
+ * scribbling over whichever globals sat at the top of .bss. A stack
+ * that lives in its own 512KB slab of extended memory can't collide
+ * with anything, and .bss stops being under pressure from it.
+ *
+ * WHY IT'S SAFE TO USE THIS RANGE: boot/stage2.asm enables A20 before
+ * entering protected mode, and vga_verify_memory_safe() already
+ * refuses to boot on machines with less than ~9.4MB of RAM, which is
+ * comfortably more than the 4MB this file's map tops out at.
+ * ============================================================ */
+
+/* The KERNEL itself (1.1-alpha-14): the disk holds it LZ4-packed in its 512 KB region; boot/stage2.asm reads that to 0x10000 (only a staging
+ * area now), switches to protected mode and unpacks it here -- where kernel/link.ld links it (`. = 0x900000`). Code + data + .bss may use
+ * [MW_KERNEL_BASE, MW_KERNEL_END); build.sh checks that .bss ends inside it. The memory manager's heap starts right after (mm.h), the program slots
+ * (MW_MWP_*) and everything else below it are as they were. The loader refuses to boot with less than MW_KERNEL_END of RAM (stage2.asm). */
+#define MW_KERNEL_BASE    0x00900000u
+#define MW_KERNEL_END     0x00A00000u
+
+#define MW_STACK_TOP      0x00180000u   /* kentry.asm loads ESP with this
+                                         * -- keep the two in sync (the
+                                         * assembler can't read a C
+                                         * header, so it's a hand-kept
+                                         * copy, called out over there) */
+#define MW_STACK_BYTES    0x00080000u
+
+/* ---- the net arena: fixed offsets, laid end to end. Adding a buffer
+ * means adding a line here (and nowhere else). The static asserts at
+ * the bottom catch an arena overflow at COMPILE time. ---- */
+#define MW_NETMEM_BASE    0x00180000u
+#define MW_NETMEM_END     0x0038F000u   /* (the arena really uses only up to 0x26C800; the back buffer and the colour table took the free top of it in alpha-14) */
+
+#define MW_TCP_RECV_SIZE  0x00008000u   /* 32KB  inbound TCP bytes, not yet read by TLS/HTTP */
+#define MW_TCP_SEND_SIZE  0x00005000u   /* 20KB  outbound queue: holds a whole max-size TLS record + slack */
+#define MW_TLS_RAW_SIZE   0x00005000u   /* 20KB  raw TLS record bytes, reassembly (16413-byte max record) */
+#define MW_TLS_HS_SIZE    0x00008000u   /* 32KB  reassembled handshake bytes (big cert chains) */
+#define MW_TLS_APP_SIZE   0x00008000u   /* 32KB  decrypted application data awaiting the HTTP layer */
+#define MW_TLS_REC_SIZE   0x00005000u   /* 20KB  scratch for building one outgoing record */
+#define MW_HTTP_BODY_SIZE 0x00040000u   /* 256KB a whole fetched page, headers included */
+#define MW_E1000_RX_SIZE  0x00010000u   /* 64KB  e1000 receive DMA buffers (32 descriptors x 2048) */
+#define MW_E1000_TX_SIZE  0x00004000u   /* 16KB  e1000 transmit DMA buffers (8 x 2048) */
+#define MW_RTL_RX_SIZE    0x00009000u   /* 36KB  rtl8139 receive ring (32KB ring + 16 + one frame of WRAP overrun) */
+#define MW_RTL_TX_SIZE    0x00001800u   /* 6KB   rtl8139 transmit slots (4 x 1536) */
+#define MW_QUIC_SIZE      0x00067000u   /* 412KB QUIC / HTTP/3: response stream, CRYPTO reassembly, send buffers (quic.h lays it out) */
+
+#define MW_TCP_RECV_ADDR  (MW_NETMEM_BASE)
+#define MW_TCP_SEND_ADDR  (MW_TCP_RECV_ADDR + MW_TCP_RECV_SIZE)
+#define MW_TLS_RAW_ADDR   (MW_TCP_SEND_ADDR + MW_TCP_SEND_SIZE)
+#define MW_TLS_HS_ADDR    (MW_TLS_RAW_ADDR  + MW_TLS_RAW_SIZE)
+#define MW_TLS_APP_ADDR   (MW_TLS_HS_ADDR   + MW_TLS_HS_SIZE)
+#define MW_TLS_REC_ADDR   (MW_TLS_APP_ADDR  + MW_TLS_APP_SIZE)
+#define MW_HTTP_BODY_ADDR (MW_TLS_REC_ADDR  + MW_TLS_REC_SIZE)
+#define MW_E1000_RX_ADDR  (MW_HTTP_BODY_ADDR + MW_HTTP_BODY_SIZE)
+#define MW_E1000_TX_ADDR  (MW_E1000_RX_ADDR + MW_E1000_RX_SIZE)
+#define MW_RTL_RX_ADDR    (MW_E1000_TX_ADDR + MW_E1000_TX_SIZE)
+#define MW_RTL_TX_ADDR    (MW_RTL_RX_ADDR   + MW_RTL_RX_SIZE)
+#define MW_QUIC_ADDR      (MW_RTL_TX_ADDR   + MW_RTL_TX_SIZE)
+#define MW_NETMEM_USED_END (MW_QUIC_ADDR + MW_QUIC_SIZE)
+
+/* Compile-time proof the arena is big enough (negative array size =
+ * build error, no libc's static_assert needed). */
+typedef char mw_assert_netmem_fits[(MW_NETMEM_USED_END <= MW_NETMEM_END) ? 1 : -1];
+
+/* ---- the HTML engine's arena (kernel/dom.h, css.h, layout.h, render.h) ----
+ * Lives ABOVE the video backbuffer (0x390000 + 854*480*4 = 0x520800) so it can't collide with the net arena or
+ * the stack, and BELOW the program slot at 0x8F0000. vga_verify_memory_safe() already insists on >= ~9.4MB of RAM
+ * (0x92C000), so all of it is real memory on any machine that gets this far. Sizes are in ELEMENTS where an
+ * element size is implied by the engine's structs -- the asserts below make a struct that outgrows its slot a
+ * COMPILE error instead of a corrupted neighbour. */
+#define MW_RD_BASE          0x00530000u
+#define MW_RD_NODE_MAX      16384u                   /* DOM nodes (32 bytes each) */
+#define MW_RD_ATTR_MAX      24576u                   /* kept attributes (8 bytes each) */
+#define MW_RD_POOL_SIZE     0x00040000u              /* 256KB text + attribute values + stylesheet copies */
+#define MW_RD_CSS_RULE_MAX  3072u                    /* rules (slot: 32 bytes each) */
+#define MW_RD_CSS_COMP_MAX  6144u                    /* selector compounds (slot: 40 bytes each) */
+#define MW_RD_CSS_DECL_MAX  12288u                   /* declarations (12 bytes each) */
+#define MW_RD_ITEM_MAX      24576u                   /* display-list items (32 bytes each) */
+#define MW_RD_FRAG_MAX      1024u                    /* line-builder fragments (slot: 24 bytes each) */
+#define MW_RD_SCRATCH_SIZE  0x00060000u              /* 384KB bump arena for tables / flex / grid */
+
+#define MW_RD_NODES_ADDR    (MW_RD_BASE)
+#define MW_RD_ATTRS_ADDR    (MW_RD_NODES_ADDR  + MW_RD_NODE_MAX * 32u)
+#define MW_RD_POOL_ADDR     (MW_RD_ATTRS_ADDR  + MW_RD_ATTR_MAX * 8u)
+#define MW_RD_CSS_RULES_ADDR (MW_RD_POOL_ADDR  + MW_RD_POOL_SIZE)
+#define MW_RD_CSS_COMPS_ADDR (MW_RD_CSS_RULES_ADDR + MW_RD_CSS_RULE_MAX * 32u)
+#define MW_RD_CSS_DECLS_ADDR (MW_RD_CSS_COMPS_ADDR + MW_RD_CSS_COMP_MAX * 40u)
+#define MW_RD_ITEMS_ADDR    (MW_RD_CSS_DECLS_ADDR + MW_RD_CSS_DECL_MAX * 12u)
+#define MW_RD_FRAGS_ADDR    (MW_RD_ITEMS_ADDR  + MW_RD_ITEM_MAX * 32u)
+#define MW_RD_SCRATCH_ADDR  (MW_RD_FRAGS_ADDR  + MW_RD_FRAG_MAX * 24u)
+#define MW_RD_END           (MW_RD_SCRATCH_ADDR + MW_RD_SCRATCH_SIZE)
+
+/* ---- the program (.MWP) slot: the syscall table and the code a program is loaded to ----
+ * These USED to sit at 0x84C00/0x85000, "comfortably above .bss" -- until .bss grew past 0x85000 (pre-23) and every
+ * program launch silently overwrote tls_conn, tcp_conn, dhcp_*, dns_client, net_cfg and the NIC state. A fixed spot
+ * in high memory can't be walked into by a growing kernel. Hand-kept copies live in programs/mwp_api.h and
+ * kernel/mwp_link.ld (a linker script can't read this header); mwp.h asserts they agree. */
+#define MW_MWP_SYSCALL_ADDR 0x008F0000u
+#define MW_MWP_LOAD_ADDR    0x008F1000u
+#define MW_MWP_END          0x00900000u
+
+/* ---- big kernel statics that used to live in .bss ----
+ * .bss sits just above the kernel image and must stay under the stack's guard band (build.sh checks the margin);
+ * every KB the engine's own state costs there is a KB the rest of the kernel can't have. So the biggest
+ * pure-cache arrays get a fixed home out here instead (they are always initialised before they are read). */
+#define MW_MISC_BASE        0x007C0000u
+#define MW_ICON_CACHE_ADDR  (MW_MISC_BASE)               /* 8 icons x 32x32 x u32 = 32KB (alpha-13: the 8th is the live disc's installer) */
+#define MW_ICON_CACHE_SIZE  0x00008000u
+/* The shared 16x16 icon cache (ui/icon16.h): up to 36 icons x 16x16 x u32 = 36KB, filled one icon at a time the first time it is
+ * drawn. It runs right up to the Korean font below. (Before alpha-10 this was MiniFiles' private 4-icon cache.) */
+#define MW_ICON16_ADDR      (MW_MISC_BASE + MW_ICON_CACHE_SIZE)
+#define MW_ICON16_MAX       32u              /* (the cache itself lives on the heap since alpha-13; this block used to be reserved and empty) */
+#define MW_ICON16_SIZE      (MW_ICON16_MAX * 1024u)
+
+/* ---- six more big statics evicted from .bss (that empty block above is their new home) ----
+ * The JavaScript engine (js.h + js_dom.h) added ~60KB to the image, which pushed .bss's end past the EBDA/VGA line and made
+ * build.sh's ceiling check fail, so the six biggest scratch buffers moved out here. kernel.c zeroes the whole block once at
+ * boot (they used to be zero-filled .bss, and nobody should have to find out the hard way who relied on that).
+ * Offsets are hand-laid end to end; the assert at the end of this block keeps them under the Korean font. */
+#define MW_BSSX_BASE        (MW_ICON16_ADDR)
+#define MW_BSSX_CLIP        (MW_BSSX_BASE + 0x0000u)   /* clipboard.h:   clip_buf,      4096 bytes */
+#define MW_BSSX_CAT         (MW_BSSX_BASE + 0x1000u)   /* shell_fs.h:    term_cat_buf,  4097 bytes (+ padding) */
+#define MW_BSSX_FXTREE      (MW_BSSX_BASE + 0x2100u)   /* minifiles.h:   fx_tree,       FX_TREE_MAX x fx_node_t = 5120 bytes */
+#define MW_BSSX_UNDO        (MW_BSSX_BASE + 0x3500u)   /* notepad/menus.h: the undo swap buffer, 4096 bytes */
+#define MW_BSSX_TERMBUF     (MW_BSSX_BASE + 0x4500u)   /* terminal.h:    the `cat`-style file read buffer, 4096 bytes */
+#define MW_BSSX_ICONRAW     (MW_BSSX_BASE + 0x5500u)   /* ui/icons.h:    one raw 32x32 icon while the cache is built, 4096 bytes */
+#define MW_BSSX_FXSAVED     (MW_BSSX_BASE + 0x6500u)   /* minifiles.h:   fx_saved, FX_SAVED_MAX x VFS_PATH_MAX = 2304 bytes (1.1.alpha-14) */
+#define MW_BSSX_ATAPI       (MW_BSSX_BASE + 0x6E00u)   /* atapi.h:       atapi_cache, ATAPI_BLOCK = 2048 bytes */
+#define MW_BSSX_LIVEBLK     (MW_BSSX_BASE + 0x7600u)   /* live.h:        live_find_image's one 2048-byte block */
+#define MW_BSSX_END         (MW_BSSX_BASE + 0x7E00u)
+typedef char mw_assert_bssx_fits[(MW_BSSX_END <= MW_MISC_BASE + MW_ICON_CACHE_SIZE + MW_ICON16_SIZE) ? 1 : -1];
+
+/* The Korean font: 11172 syllables x 11 rows x u16 = 245,784 bytes, inflated here at boot from the LZ4 table in
+ * font_ko_data.h (63 KB in the image instead of 245 KB -- the image has a hard 512 KB budget, this region does not).
+ * Read-only after ko_font_init(). */
+#ifndef MW_KFONT_ADDR                                    /* (host tests point this at an ordinary array) */
+#define MW_KFONT_ADDR       0x007D0000u
+#endif
+#define MW_KFONT_SIZE       0x0003D000u
+
+/* Storage DMA: what the AHCI and SCSI drivers (ahci.h, mpt.h) hand to their controllers -- command lists, FIS
+ * receive areas, command tables, request/reply frames and a bounce sector per device. Plain RAM below 4 GB,
+ * identity-mapped, so a pointer IS the bus address. Each driver gets a fixed slice; the asserts keep them apart. */
+#ifndef MW_STOR_DMA_ADDR
+#define MW_STOR_DMA_ADDR    0x00810000u
+#endif
+#define MW_STOR_DMA_SIZE    0x00020000u
+#define MW_AHCI_DEV_STRIDE  0x00000800u   /* per SATA device: CLB 0x000, FIS 0x400, command table 0x500, bounce sector 0x600 */
+#define MW_AHCI_DEVS        8u
+#define MW_AHCI_DMA_ADDR    (MW_STOR_DMA_ADDR)
+#define MW_AHCI_DMA_SIZE    (MW_AHCI_DEV_STRIDE * MW_AHCI_DEVS)
+#define MW_MPT_DMA_ADDR     (MW_STOR_DMA_ADDR + 0x00004000u)   /* SCSI (LSI Logic / MPT): one 4 KB slice per controller */
+#define MW_MPT_CTRL_STRIDE  0x00001000u
+#define MW_MPT_CTRLS        2u
+#define MW_MPT_DMA_SIZE     (MW_MPT_CTRL_STRIDE * MW_MPT_CTRLS)
+#define MW_NVME_DMA_ADDR    (MW_MPT_DMA_ADDR + MW_MPT_DMA_SIZE)  /* NVMe: six 4 KB pages per controller (page-aligned: queues must be) */
+#define MW_NVME_CTRL_STRIDE 0x00006000u
+#define MW_NVME_CTRLS       2u
+#define MW_NVME_DMA_SIZE    (MW_NVME_CTRL_STRIDE * MW_NVME_CTRLS)
+#define MW_FD_DMA_ADDR      (MW_NVME_DMA_ADDR + MW_NVME_DMA_SIZE)   /* floppy: one 9 KB track buffer + one sector (ISA DMA: below 16 MB, no 64 KB crossing) */
+#define MW_FD_DMA_SIZE      0x00002800u
+
+/* USB host controllers (usb/xhci.h, ehci.h, ohci.h): one 64 KB slice per controller, plain RAM below 4 GB (a pointer IS the
+ * bus address). What lives inside a slice is each driver's own business (its header has the map); the slice only has to be
+ * big enough and 4 KB aligned, and the assert below proves the four of them sit between the storage DMA and the MWP slot. */
+#define MW_USB_DMA_ADDR     0x00830000u
+#define MW_USB_HC_MAX       4u
+#define MW_USB_HC_STRIDE    0x00010000u
+#define MW_USB_DMA_SIZE     (MW_USB_HC_STRIDE * MW_USB_HC_MAX)
+
+typedef char mw_assert_usb_dma_fits[(MW_USB_DMA_ADDR >= (MW_STOR_DMA_ADDR + MW_STOR_DMA_SIZE) && (MW_USB_DMA_ADDR + MW_USB_DMA_SIZE) <= MW_MWP_SYSCALL_ADDR && (MW_USB_DMA_ADDR & 0xFFFu) == 0) ? 1 : -1];
+typedef char mw_assert_rd_fits[(MW_RD_END <= MW_MISC_BASE) ? 1 : -1];
+typedef char mw_assert_misc_fits[((MW_MISC_BASE + MW_ICON_CACHE_SIZE) <= MW_MWP_SYSCALL_ADDR) ? 1 : -1];
+typedef char mw_assert_icon16_fits[((MW_ICON16_ADDR + MW_ICON16_SIZE) <= 0x007D0000u) ? 1 : -1];
+typedef char mw_assert_kfont_fits[((0x007D0000u + MW_KFONT_SIZE) <= MW_MWP_SYSCALL_ADDR && 0x007D0000u >= (MW_MISC_BASE + MW_ICON_CACHE_SIZE + MW_ICON16_SIZE)) ? 1 : -1];
+typedef char mw_assert_stor_dma_fits[((0x00810000u + MW_STOR_DMA_SIZE) <= MW_MWP_SYSCALL_ADDR && 0x00810000u >= (0x007D0000u + MW_KFONT_SIZE) && MW_AHCI_DMA_SIZE <= 0x4000u && 0x4000u + MW_MPT_DMA_SIZE + MW_NVME_DMA_SIZE + MW_FD_DMA_SIZE <= MW_STOR_DMA_SIZE && (MW_NVME_DMA_ADDR & 0xFFFu) == 0 && (MW_FD_DMA_ADDR >> 16) == ((MW_FD_DMA_ADDR + MW_FD_DMA_SIZE - 1) >> 16) && (MW_FD_DMA_ADDR + MW_FD_DMA_SIZE) < 0x01000000u) ? 1 : -1];
+typedef char mw_assert_rd_above_backbuf[(MW_RD_BASE >= 0x0052C000u) ? 1 : -1];
+typedef char mw_assert_mwp_in_ram[(MW_MWP_END <= 0x0092C000u) ? 1 : -1];
+
+#endif
