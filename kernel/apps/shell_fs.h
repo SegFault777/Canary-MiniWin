@@ -8,7 +8,7 @@
  * "/" is the root volume, "/mnt/<id>" any mounted volume, paths are absolute or relative to the current directory (which is
  * also what the prompt shows). Included by terminal.h, after its output helpers. */
 
-/* After a command changed /docs or /progs: re-read the slot indexes and the desktop's own copy of them. */
+/* After a command changed /home/docs or /progs: re-read the slot indexes and the desktop's own copy of them. */
 static void term_fs_changed(void) {
     fs_rescan_docs();
     fs_rescan_progs();
@@ -28,7 +28,7 @@ static void term_fs_err(const char *what, int e) {
     term_print_wrapped(mwfs_err_text(e), 2);
 }
 
-/* The prompt: the current directory, then "~# " for root or "~$ " for a user -- "/docs~# ", "/mnt/ide200/photos~$ ". A long path keeps
+/* The prompt: the current directory, then "~# " for root or "~$ " for a user -- "/home/docs~# ", "/mnt/ide200/photos~$ ". A long path keeps
  * its END ("...x/y/z/a/b/c~# "), which is the part that says where you are. While a password is being asked for, the prompt says what
  * is wanted instead. */
 static void term_prompt_str(char *out, u32 cap) {

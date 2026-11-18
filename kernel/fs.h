@@ -26,7 +26,7 @@
  *                Galmuri11 first (the default; the kernel no longer carries it), then, on the full image, Galmuri7 / 9 / 14 and
  *                Galmuri11 Bold. Format and tools: tools/gen_font_pack.py; reader: kernel/fontpack.h. The floppy image and a plain
  *                build have only Galmuri11 in it (the rest of the region is zero). Being in the system area, os-inst copies it.
- *   LBA 2373-2687 the ROOT VOLUME, "/": an MWFS of 315 sectors in the stock image, holding /docs, /progs, /mnt and /sys.
+ *   LBA 2373-2687 the ROOT VOLUME, "/": an MWFS of 315 sectors in the stock image, holding the directory tree of vfs.h (/home/docs, /progs, /etc, ...).
  *                os-inst gives an installation on a bigger partition a root volume that fills the rest of the partition.
  * Every sector from LBA 1 to LBA 2687 is spoken for; build.sh checks that the kernel budget, the catalog and the root
  * volume really do follow one another with no overlap. */
@@ -64,7 +64,7 @@ static inline int fs_boot_mount(void) {
     return vfs_mount_root(blk_boot_dev, blk_boot_base + MW_ROOTFS_LBA, region);
 }
 
-/* ============================================================ documents: /docs, as slots */
+/* ============================================================ documents: /home/docs, as slots */
 static struct { u8 used; u32 ino, len; } fs_doc_tab[FS_MAX_FILES];
 static char fs_doc_names[FS_MAX_FILES][FS_NAME_MAXLEN + 1];          /* the name of a used slot, or a name reserved for a save in progress */
 
@@ -74,11 +74,9 @@ static const char *fs_doc_name(int slot) {
 static inline mwfs_vol_t *fs_root(void) { return vfs_is_root_ok() ? &vfs_vols[0] : 0; }
 static inline int fs_dir_ino(const char *name, u32 *ino) {
     mwfs_vol_t *v = fs_root();
-    u8 t;
     if (!v) return 0;
-    int e = mwfs_dir_lookup(v, MWFS_ROOT_INO, name, ino, &t);
-    if (e == MWFS_E_NOENT) { u32 n; if (mwfs_mkdir(v, MWFS_ROOT_INO, name, &n) == MWFS_OK) { *ino = n; return 1; } return 0; }
-    return e == MWFS_OK && t == MWFS_T_DIR;
+    const char *path = mwfs_name_eq(name, "docs") ? "home/docs" : name;        /* documents live in /home/docs, programs in /progs */
+    return vfs_layout_dir(v, path, ino) == MWFS_OK;                             /* found, or made if it was missing */
 }
 
 /* Re-reads /docs into the slot index. Slots keep their number as long as their file keeps its name; new files take free slots. */

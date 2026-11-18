@@ -18,6 +18,28 @@ static mwfs_vol_t vfs_vols[VFS_MAX_VOLS];               /* [0] = "/" */
 static int  vfs_root_err = MWFS_E_NOFS;                 /* MWFS_OK once the root volume is mounted */
 static char vfs_cwd[VFS_PATH_MAX] = "/";
 static u32  vfs_mnt_ino = 0;                            /* inode of the physical /mnt directory on the root volume */
+static int  vfs_priv = 0;                               /* nonzero: the caller may change the system directories (root in the terminal, or the kernel itself) */
+
+/* The system directories of the root volume. Everything directly under "/" and everything inside these can be LOOKED AT by anyone but changed
+ * only with vfs_priv set -- the terminal sets it for a root session, MiniFiles, Notepad and programs never do. /home /tmp /progs and /mnt
+ * (and what is inside them) stay open to every user; what is inside /mnt is another volume anyway. */
+static const char *const vfs_sysdirs[] = { "boot", "dev", "etc", "bin", "lib", "sys", "proc", "var" };
+
+/* 1 = this canonical absolute path is protected: "/" itself, a top-level entry, or anything inside a system directory. */
+static inline int vfs_is_sys_path(const char *abs) {
+    const char *p = abs;
+    while (*p == '/') p++;
+    if (!*p) return 1;
+    int n = 0; while (p[n] && p[n] != '/') n++;
+    const char *rest = p + n; while (*rest == '/') rest++;
+    if (!*rest) return 1;
+    for (unsigned i = 0; i < sizeof vfs_sysdirs / sizeof *vfs_sysdirs; i++) {
+        const char *s = vfs_sysdirs[i]; int k = 0;
+        while (k < n && s[k]) { char a = p[k], b = s[k]; if (a >= 'A' && a <= 'Z') a = (char)(a + 32); if (a != b) break; k++; }
+        if (k == n && !s[k]) return 1;
+    }
+    return 0;
+}
 
 static inline int vfs_is_root_ok(void) { return vfs_root_err == MWFS_OK; }
 
@@ -149,9 +171,19 @@ static inline int vfs_ls_each(const vfs_node_t *dir, mwfs_dirent_fn fn, void *ct
     return mwfs_dir_each(&vfs_vols[dir->vol], dir->ino, fn, ctx);
 }
 
+/* MWFS_OK if the caller may create, change or remove `path` (relative paths count from the current directory). */
+static inline int vfs_may_change(const char *path) {
+    if (vfs_priv) return MWFS_OK;
+    char abs[VFS_PATH_MAX];
+    int e = vfs_norm(path, abs, sizeof abs);
+    if (e != MWFS_OK) return e;
+    return vfs_is_sys_path(abs) ? MWFS_E_RO : MWFS_OK;
+}
 static inline int vfs_mkdir(const char *path) {
     vfs_node_t n;
-    int e = vfs_lookup(path, &n);
+    int e = vfs_may_change(path);
+    if (e != MWFS_OK) return e;
+    e = vfs_lookup(path, &n);
     if (e != MWFS_OK) return e;
     if (n.exists) return MWFS_E_EXIST;
     if (n.pvol == 0 && n.pino == vfs_mnt_ino && vfs_mnt_ino) return MWFS_E_PERM;     /* mount points are made by `part mount` */
@@ -159,7 +191,9 @@ static inline int vfs_mkdir(const char *path) {
 }
 static inline int vfs_write(const char *path, const u8 *data, u32 len, u32 aux) {
     vfs_node_t n;
-    int e = vfs_lookup(path, &n);
+    int e = vfs_may_change(path);
+    if (e != MWFS_OK) return e;
+    e = vfs_lookup(path, &n);
     if (e != MWFS_OK) return e;
     if (n.exists && n.type == MWFS_T_DIR) return MWFS_E_ISDIR;
     if (n.pvol == 0 && n.pino == vfs_mnt_ino && vfs_mnt_ino) return MWFS_E_PERM;
@@ -176,6 +210,8 @@ static inline int vfs_read(const char *path, u8 *dst, u32 max, u32 *len, u32 *au
 static inline int vfs_rm(const char *path) {
     vfs_node_t n;
     int e = vfs_stat(path, &n);
+    if (e != MWFS_OK) return e;
+    e = vfs_may_change(path);
     if (e != MWFS_OK) return e;
     if (n.is_mnt_dir || n.is_mountpoint || n.ino == MWFS_ROOT_INO) return MWFS_E_PERM;     /* "/", "/mnt" and the mounts: part unmount is the way */
     return mwfs_unlink(&vfs_vols[n.pvol], n.pino, n.leaf);
@@ -198,6 +234,8 @@ static inline int vfs_cp(const char *from, const char *to) {
         return vfs_cp(from, full);
     }
     if (b.pvol == 0 && b.pino == vfs_mnt_ino && vfs_mnt_ino) return MWFS_E_PERM;
+    e = vfs_may_change(to);
+    if (e != MWFS_OK) return e;
     if (b.exists && b.vol == a.vol && b.ino == a.ino) return MWFS_E_EXIST;
     return mwfs_file_copy(&vfs_vols[a.vol], a.ino, &vfs_vols[b.pvol], b.pino, b.leaf);
 }
@@ -206,6 +244,8 @@ static inline int vfs_mv(const char *from, const char *to) {
     int e = vfs_stat(from, &a);
     if (e != MWFS_OK) return e;
     if (a.is_mnt_dir || a.is_mountpoint || a.ino == MWFS_ROOT_INO) return MWFS_E_PERM;
+    e = vfs_may_change(from);                                   /* taking something out of a system directory changes it */
+    if (e != MWFS_OK) return e;
     e = vfs_lookup(to, &b);
     if (e != MWFS_OK) return e;
     char dest[VFS_PATH_MAX];
@@ -218,7 +258,9 @@ static inline int vfs_mv(const char *from, const char *to) {
         dest[n] = 0;
         e = vfs_lookup(dest, &b);
         if (e != MWFS_OK) return e;
-    }
+        e = vfs_may_change(dest);
+    } else e = vfs_may_change(to);
+    if (e != MWFS_OK) return e;
     if (b.pvol == 0 && b.pino == vfs_mnt_ino && vfs_mnt_ino) return MWFS_E_PERM;
     if (b.pvol == a.pvol) return mwfs_rename(&vfs_vols[a.pvol], a.pino, a.leaf, b.pino, b.leaf);
     if (a.type != MWFS_T_FILE) return MWFS_E_XDEV;                  /* directories do not move between volumes */
@@ -275,14 +317,54 @@ static inline int vfs_unmount(const char *id) {
     return MWFS_OK;
 }
 
-/* Creates the standard directories of a root volume. */
-static const char *const vfs_root_dirs[] = { "docs", "progs", "mnt", "sys" };
+/* The standard directory tree of a root volume (tools/mwfs.py's default --dirs is the same list; a name with a '/' lies inside the one before it):
+ *   /boot /dev /etc /bin /lib /sys /proc   system: boot files, devices, settings (ROOT.PWD), programs, libraries, kernel info -- root only
+ *   /var                                    logs, caches, state -- root only
+ *   /mnt                                    where the other volumes are mounted (kept empty, `part mount` fills the list)
+ *   /tmp                                    scratch files
+ *   /home/docs /home/dwns /home/start       documents, downloads, the Start Menu's shortcuts
+ *   /progs                                  the programs of the OS (the desktop and the Start Menu list them)
+ * /boot /dev /sys /proc /bin /lib /var are empty for now: they are where boot files, device nodes, kernel information and shared code will live. */
+static const char *const vfs_root_dirs[] = { "boot", "dev", "etc", "bin", "lib", "sys", "proc", "mnt", "tmp", "var", "home", "home/docs", "home/dwns", "progs" };
+
+/* Finds or creates the directory `path` ("home/docs", no leading slash) on volume v, parents too; its inode goes to *ino. */
+static inline int vfs_layout_dir(mwfs_vol_t *v, const char *path, u32 *ino) {
+    u32 dir = MWFS_ROOT_INO;
+    const char *p = path;
+    while (*p) {
+        char tok[MWFS_NAME_MAX + 1]; int n = 0;
+        while (p[n] && p[n] != '/') { if (n >= MWFS_NAME_MAX) return MWFS_E_NAME; tok[n] = p[n]; n++; }
+        tok[n] = 0; p += n; if (*p == '/') p++;
+        u32 i = 0; u8 t = 0;
+        int e = mwfs_dir_lookup(v, dir, tok, &i, &t);
+        if (e == MWFS_OK) { if (t != MWFS_T_DIR) return MWFS_E_NOTDIR; }
+        else if (e == MWFS_E_NOENT) { e = mwfs_mkdir(v, dir, tok, &i); if (e != MWFS_OK) return e; }
+        else return e;
+        dir = i;
+    }
+    if (ino) *ino = dir;
+    return MWFS_OK;
+}
 static inline int vfs_make_root_layout(mwfs_vol_t *v) {
     for (unsigned i = 0; i < sizeof vfs_root_dirs / sizeof *vfs_root_dirs; i++) {
-        int e = mwfs_mkdir(v, MWFS_ROOT_INO, vfs_root_dirs[i], 0);
-        if (e != MWFS_OK && e != MWFS_E_EXIST) return e;
+        int e = vfs_layout_dir(v, vfs_root_dirs[i], 0);
+        if (e != MWFS_OK) return e;
     }
     return MWFS_OK;
+}
+
+/* A volume made before the tree above had /docs and /start at the top and the root password in /sys: move them into place (a rename, so
+ * nothing is copied). Runs at every mount and does nothing once the volume is in the new shape; a name that is already taken is left alone. */
+static inline void vfs_migrate_layout(mwfs_vol_t *v) {
+    u32 home, etc, a, b; u8 t;
+    if (vfs_layout_dir(v, "home", &home) != MWFS_OK || vfs_layout_dir(v, "etc", &etc) != MWFS_OK) return;
+    static const char *const up[] = { "docs", "start" };
+    for (int i = 0; i < 2; i++)
+        if (mwfs_dir_lookup(v, MWFS_ROOT_INO, up[i], &a, &t) == MWFS_OK && t == MWFS_T_DIR && mwfs_dir_lookup(v, home, up[i], &b, &t) == MWFS_E_NOENT)
+            mwfs_rename(v, MWFS_ROOT_INO, up[i], home, up[i]);
+    if (mwfs_dir_lookup(v, MWFS_ROOT_INO, "sys", &a, &t) == MWFS_OK && t == MWFS_T_DIR && mwfs_dir_lookup(v, a, "ROOT.PWD", &b, &t) == MWFS_OK && t == MWFS_T_FILE &&
+        mwfs_dir_lookup(v, etc, "ROOT.PWD", &b, &t) == MWFS_E_NOENT)
+        mwfs_rename(v, a, "ROOT.PWD", etc, "ROOT.PWD");
 }
 
 /* Mounts the root volume found at dev/base (region sectors long). Missing standard directories are re-created. */
@@ -296,6 +378,7 @@ static inline int vfs_mount_root(int dev, u32 base, u32 region) {
     vfs_root_err = MWFS_OK;
     vfs_mnt_ino = 0;
     mwfs_strcpy(vfs_cwd, "/", sizeof vfs_cwd);
+    vfs_migrate_layout(&vfs_vols[0]);
     vfs_make_root_layout(&vfs_vols[0]);
     u32 i; u8 t;
     if (mwfs_dir_lookup(&vfs_vols[0], MWFS_ROOT_INO, "mnt", &i, &t) == MWFS_OK) vfs_mnt_ino = i;

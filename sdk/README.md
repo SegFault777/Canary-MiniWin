@@ -102,14 +102,14 @@ Check `mw_has(2)` (or 3) before using anything beyond the version-1 group; a 1.1
 | drawing (v1) | `put_pixel`, `fill_rect`, `draw_rect`, `draw_string` (Latin), `draw_string_ko` (Latin + Hangul), `present`, `screen_w`, `screen_h` |
 | input | `key_poll` (v1), `mouse_poll(&x,&y,&buttons)` (v2: bit 0 = left, bit 1 = right; returns 1 when something changed) |
 | memory (v2) | `mem_alloc(n)` zero-filled, 16-aligned, 0 when out of memory; `mem_free(p)`; `mem_free_kb()`. At most 64 blocks and 4 MB per run; whatever you forget is freed when you return |
-| files (v2) | `file_size`, `file_read(path, buf, max)`, `file_write(path, data, len)`, `file_delete`, `dir_make`, `dir_list(path, callback, ctx)`; paths are absolute (`/docs/DOC.TXT`); errors are negative numbers, `err_text(e)` says what happened in words |
+| files (v2) | `file_size`, `file_read(path, buf, max)`, `file_write(path, data, len)`, `file_delete`, `dir_make`, `dir_list(path, callback, ctx)`; paths are absolute (`/home/docs/DOC.TXT`); errors are negative numbers, `err_text(e)` says what happened in words |
 | time (v2) | `ticks_ms()` (call at least every 2 s), `sleep_ms(n)`, `time_now(&t)` (the hardware clock) |
 | UI helpers (v2) | `draw_icon16`/`draw_icon12` (`MWI_*`), `text_width`, `bevel`, `button`, `window_frame(x,y,w,h,title,icon)` |
 | misc (v2) | `log(s)` to the serial port, `rand32()` |
 | window (v3) | `run_flags` (`MW_RUN_WINDOWED`), `set_title(s)`, `set_size(w, h)` (resize the window to that drawing area), `set_icon(argb16)`, `args` |
 | more (v3) | `clipboard_get/set` (shared with Notepad), `theme_color(MW_TH_*)`, `beep(hz, ms)` |
 
-A file written under `/docs` or `/progs` shows up on the desktop straight away.
+A file written under `/home/docs` or `/progs` shows up on the desktop straight away.
 
 ## Keeping the two sides in step
 

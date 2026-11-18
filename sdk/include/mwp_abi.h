@@ -62,7 +62,7 @@ typedef struct {
     void *(*mem_alloc)(u32 bytes);                                              /* zero-filled, 16-byte aligned; 0 = out of memory (64 blocks at most) */
     int   (*mem_free)(void *p);                                                 /* 1 = freed, 0 = not a block of this program */
     u32   (*mem_free_kb)(void);                                                 /* KB of RAM not yet handed out */
-    /* files and folders: absolute paths of the root filesystem ("/docs/DOC.TXT", "/mnt/ide200/x"). Errors are NEGATIVE:
+    /* files and folders: absolute paths of the root filesystem ("/home/docs/DOC.TXT", "/mnt/ide200/x"). Errors are NEGATIVE:
      * -3 not found, -2 disk full, -4 exists, -6 is a folder, -7 folder not empty, -8 bad name, -10 too big, -13 not allowed;
      * err_text turns one into a sentence. */
     int   (*file_size)(const char *path);                                       /* bytes, or an error */

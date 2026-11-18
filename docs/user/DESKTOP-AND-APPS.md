@@ -33,7 +33,7 @@ ordinary PCs do; otherwise the screen simply stays).
 folders at most); a shortcut starts the program. *Add...* at the bottom of the first list opens a small wizard, like the Windows 95 one:
 pick the program (Notepad, Setting, MiniWeb, MiniShell, MiniFiles or a program of `/progs`), then **Select Program Folder** -- a tree that
 starts at *Start Menu*; press **New Folder...**, type a name and Enter to make a folder inside the selected one -- and **Finish**. The
-folders and shortcuts are ordinary files in `/start` on the root volume (a shortcut is a tiny text file, `app:NOTEPAD` or `prog:HELLO.MWP`,
+folders and shortcuts are ordinary files in `/home/start` on the root volume (a shortcut is a tiny text file, `app:NOTEPAD` or `prog:HELLO.MWP`,
 named `NAME.LNK`), so MiniFiles and MiniShell can rename or delete them. On a live disc the root volume is in RAM: they last until the
 next boot.
 

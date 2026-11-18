@@ -177,10 +177,10 @@ static int root_volume_ok(int dev, u32 base, u32 target_sectors, u32 *data_end) 
     v.dev = dev; v.base = base + MW_ROOTFS_LBA; v.sectors = target_sectors - MW_ROOTFS_LBA;
     if (mwfs_open(&v) != MWFS_OK || v.sectors != target_sectors - MW_ROOTFS_LBA) return 0;
     u32 ino; u8 t;
-    if (mwfs_dir_lookup(&v, MWFS_ROOT_INO, "docs", &ino, &t) != MWFS_OK || mwfs_dir_lookup(&v, MWFS_ROOT_INO, "progs", &ino, &t) != MWFS_OK) return 0;
+    if (mwfs_dir_lookup(&v, MWFS_ROOT_INO, "home", &ino, &t) != MWFS_OK || mwfs_dir_lookup(&v, MWFS_ROOT_INO, "progs", &ino, &t) != MWFS_OK || mwfs_dir_lookup(&v, MWFS_ROOT_INO, "etc", &ino, &t) != MWFS_OK) return 0;
     mwfs_dirent_t e; u32 n = 0; while (mwfs_dir_nth(&v, MWFS_ROOT_INO, n, &e) == 1) n++;
     mwfs_report_t r;
-    if (n != 4 || mwfs_check(&v, 0, &r) != MWFS_OK || r.bad_entries || r.orphans || r.leaked || r.unmarked) return 0;
+    if (n != 12 || mwfs_check(&v, 0, &r) != MWFS_OK || r.bad_entries || r.orphans || r.leaked || r.unmarked) return 0;
     if (data_end) *data_end = MW_ROOTFS_LBA + v.data_lba;
     return 1;
 }
@@ -197,7 +197,7 @@ static void test_install(void) {
     inst_step(10); CHECK(inst_percent() == 0 && inst.phase == INST_PHASE_WRITE, "progress starts at 0%% (%u)", inst_percent());
     CHECK(run_job() == INST_PHASE_DONE && inst.err == INST_ERR_NONE, "whole-device install completes (phase %d err %d lba %u)", inst.phase, inst.err, inst.err_lba);
     CHECK(image_ok(2, 0, 0x1234ABCD, 0, 0, &bad), "the target holds exactly the expected installation (first bad sector: %u)", bad);
-    CHECK(root_volume_ok(2, 0, 8192, &dend), "the target got a fresh, clean root filesystem with /docs /progs /mnt /sys");
+    CHECK(root_volume_ok(2, 0, 8192, &dend), "the target got a fresh, clean root filesystem with the standard tree (12 top-level directories)");
     CHECK(dend > MW_ROOTFS_LBA && all_sentinel(2, dend + 8, 8192), "the volume's data area (beyond its few directory sectors) was not touched (%u)", dend);
     full_writes = writes_done[2];
     CHECK(inst.mbr_result == INST_MBR_NONE && inst_percent() == 100, "no disk MBR logic for a whole-device install");

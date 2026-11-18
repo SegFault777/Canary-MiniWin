@@ -11,7 +11,7 @@ its edges, minimise (to the task bar), maximise, close.
 ```
  File  Edit  View  Tools  Help
  [up][new] [Copy][Cut][Paste] [delete][refresh][disks]
- All Folders          | Contents of /docs
+ All Folders          | Contents of /home/docs
  [-] MiniWin          | Name         Size     Type     Modified
    [+] docs           | DOC.TXT      12 B     Text     26-10-25
    [+] mnt            | NOTES.TXT    1 KB     Text     26-10-24
@@ -40,16 +40,16 @@ the volume. Messages ("Deleted.", "That is not a valid name.", ...) replace the 
 | up arrow | | the parent folder |
 | folder | File > New Folder | makes `NewFolder` (then `NewFolder2`, ...) in the open folder and starts renaming it |
 | Copy / Cut / Paste | Edit | copy a **file** (folders can be moved with Cut, not copied), then open another folder and Paste there; a name that is already used is refused, never overwritten |
-| trash | File > Delete | the first click arms it (*Click DELETE again: NAME*), the second deletes; a folder must be empty; the folders the system stands on (`/docs`, `/progs`, `/mnt`, `/sys`, the volumes) cannot be deleted or renamed; a document open in Notepad cannot be deleted or renamed |
+| trash | File > Delete | the first click arms it (*Click DELETE again: NAME*), the second deletes; a folder must be empty; the top-level folders and the root-only folders (`/etc`, `/lib`, ... are shown *read-only*: MiniFiles is always a user, changing them takes `root` in MiniShell) and the folders the system stands on (`/home/docs`, `/progs`, `/mnt`, `/sys`, the volumes) cannot be deleted or renamed; a document open in Notepad cannot be deleted or renamed |
 | refresh | File > Refresh | rereads the disk (the lists are built when you open a folder and after your own actions, not continuously) |
 | computer | View > Disks | goes to `/mnt`, where the disks are listed (below); View > Folders goes back to `/` |
 | Mount / Unmount / Install | Tools | work on the selected disk or partition in `/mnt` (the buttons appear only there; a button that does not fit a narrow window is left out, the menu always has it) |
 | | File > Rename | an inline name box on the selected row: type, **Enter** accepts, **Esc** cancels; a click elsewhere accepts |
-| | File > Open | a folder: go into it; a program in `/progs`: run it (the screen is repainted when it returns); a document in `/docs`: open it in Notepad |
+| | File > Open | a folder: go into it; a program in `/progs`: run it (the screen is repainted when it returns); a document in `/home/docs`: open it in Notepad |
 | | Tools > MiniShell here | opens MiniShell with `cd <this folder>` typed in (press Enter) |
 
-A file elsewhere than `/docs` and `/progs` cannot be opened from here yet (*Only files in /docs open in Notepad.*, *Programs run from
-/progs.*); MiniShell's `cat` and `cp` work on any path. Changes under `/docs` and `/progs` also update the desktop icons.
+A file elsewhere than `/home/docs` and `/progs` cannot be opened from here yet (*Only files in /home/docs open in Notepad.*, *Programs run from
+/progs.*); MiniShell's `cat` and `cp` work on any path. Changes under `/home/docs` and `/progs` also update the desktop icons.
 
 A file that fails its CRC-32 check when you select it (small files only) is flagged **DAMAGED** and refuses to open
 (see [DISK-LAYOUT.md](../dev/DISK-LAYOUT.md)).

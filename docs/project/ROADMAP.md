@@ -26,7 +26,7 @@ MiniWeb and MiniFiles; scroll bars you can drag and the mouse wheel, also in Not
   (`A-Z a-z 0-9 . _ - ,`); paths 96. No timestamps, permissions or links yet. Directories cannot be moved between volumes, and a
   directory is not removed with its contents (`rm` takes empty ones only). Old disks (alpha-8 and before) are not converted.
 * **Desktop.** Up to 64 documents and 32 programs get an index entry (the desktop, Notepad, MiniFiles); MiniFiles still shows a flat list
-  of `/docs` and `/progs`. Notepad's menu bar is its own older code, not the shared widget.
+  of `/home/docs` and `/progs`. Notepad's menu bar is its own older code, not the shared widget.
 * **A resolved ARP entry never expires**; the file system assumes a drive writes one sector atomically and in order.
 * **TLS.** TLS 1.3 (x25519, P-256 and P-384 key shares via HelloRetryRequest; AES-128/256-GCM; RSA-PSS and ECDSA certificates) and TLS 1.2. No session resumption or 0-RTT, no revocation checking, no name constraints (certificates that make either critical are refused). **HTTP/3 over QUIC v1** (`quic.h`, `h3.h`: AES-128-GCM, QPACK without a dynamic table, loss recovery by PTO; no Retry / Version Negotiation / 0-RTT / migration / congestion control -- see the changelog).
 * **Ring 3.** Everything runs in ring 0, with no memory protection (now planned for alpha-14).

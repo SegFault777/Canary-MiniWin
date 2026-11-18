@@ -54,6 +54,7 @@
 #define MWFS_E_SMALL     12
 #define MWFS_E_PERM      13                      /* a mount point or other place that is not a normal directory */
 #define MWFS_E_XDEV      14
+#define MWFS_E_RO        15                      /* a system directory: only root (in the terminal) may change it */
 
 static inline const char *mwfs_err_text(int e) {
     switch (e) {
@@ -72,6 +73,7 @@ static inline const char *mwfs_err_text(int e) {
         case MWFS_E_SMALL:   return "volume too small";
         case MWFS_E_PERM:    return "not allowed there";
         case MWFS_E_XDEV:    return "that would cross volumes";
+        case MWFS_E_RO:      return "read-only: only root can change this";
     }
     return "error";
 }

@@ -17,7 +17,7 @@
  * Memory: mem_alloc hands out kernel-heap blocks and remembers them (64 per program run). When the program returns, mwp_run()
  * calls mwp_api2_release() and every block still held is freed -- a leaking program cannot slowly eat the heap of the OS.
  * Needs (included before this): mm.h, vfs.h, rtc.h, delay.h, sysinfo.h, serial.h, ui/icon16.h, ui/widgets.h, mouse.h, font_ko.h,
- * apps/minifiles.h (fx_resync_desktop: a file written into /docs or /progs must show up on the desktop). */
+ * apps/minifiles.h (fx_resync_desktop: a file written into /home/docs or /progs must show up on the desktop). */
 
 #define MWP_ALLOC_CAP (4u * 1024u * 1024u)            /* one run may hold at most 4 MB */
 
@@ -68,7 +68,7 @@ static int mwp_under(const char *path, const char *dir) {            /* path is 
     return a[n] == 0 || a[n] == '/';
 }
 static void mwp_resync_if_slot_dir(const char *path) {
-    if (mwp_under(path, "/docs") || mwp_under(path, "/progs")) fx_resync_desktop();
+    if (mwp_under(path, "/home/docs") || mwp_under(path, "/progs")) fx_resync_desktop();
 }
 static int mwp_sys_file_size(const char *path) {
     vfs_node_t n;

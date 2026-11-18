@@ -62,7 +62,7 @@ The disk map lives in the header comment of `kernel/fs.h`: boot sector, stage 2,
 files that grow and a free-space bitmap. There is no journal: a save builds the new file in a fresh inode and one directory-entry
 sector write switches the name over, so an interruption leaves the old file or the whole new one and, at worst, garbage that
 `part check <id> fix` collects; every file carries a CRC-32 that loads verify. The old "slot" API survives in `fs.h` as an index of
-`/docs` and `/progs` for the desktop, Notepad and MiniFiles. Details: [DISK-LAYOUT.md](DISK-LAYOUT.md).
+`/home/docs` and `/progs` for the desktop, Notepad and MiniFiles. Details: [DISK-LAYOUT.md](DISK-LAYOUT.md).
 
 ## Network input is validated at every layer
 

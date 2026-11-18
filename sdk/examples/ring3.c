@@ -56,11 +56,11 @@ void mwp_entry(void) {
             if (buf) {
                 for (int i = 0; i < 99; i++) buf[i] = (char)('A' + i % 26);
                 buf[99] = 0;
-                int w = sys.file_write("/docs/R3TEST.TXT", buf, 100);
+                int w = sys.file_write("/home/docs/R3TEST.TXT", buf, 100);
                 char back[100]; for (int i = 0; i < 100; i++) back[i] = 0;
-                int r = sys.file_read("/docs/R3TEST.TXT", back, 100);
+                int r = sys.file_read("/home/docs/R3TEST.TXT", back, 100);
                 int same = 1; for (int i = 0; i < 100; i++) if (back[i] != buf[i]) same = 0;
-                int d = sys.file_delete("/docs/R3TEST.TXT");
+                int d = sys.file_delete("/home/docs/R3TEST.TXT");
                 ok = (w == 0 && r == 100 && same && d == 0);
                 sys.mem_free(buf);
             }

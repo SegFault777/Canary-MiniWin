@@ -85,7 +85,7 @@ sector (sector 0 for a whole disk, the partition's first sector for a partition)
 
 * the **boot sector** with two patched fields: where this installation starts, and a fresh random *install id*;
 * **stage 2 and the kernel**, and the **icon catalog** (sectors 0-1732), copied from the disk MiniWin booted from;
-* a **fresh, empty root file system** (MWFS, with `/docs`, `/progs`, `/mnt` and `/sys`) formatted over the rest of the target, up to
+* a **fresh, empty root file system** (MWFS, with the standard folders: `/home/docs`, `/progs`, `/etc`, `/tmp`, `/mnt`, ... see [FILES-AND-DISKS.md](FILES-AND-DISKS.md)) formatted over the rest of the target, up to
   8 GB of it: the new system starts with *no user data*, and stale bytes in the target can never be mistaken for a file. A bigger
   partition keeps its tail unused; `part format` + `part mount` can use it as a data disk.
 

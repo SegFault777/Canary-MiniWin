@@ -8,7 +8,7 @@
  *   | MINIFILES.MWP                                        _ [] X  |  title bar (with its icon)
  *   | File  Edit  View  Tools  Help                                |  menu bar (ui/menubar.h)
  *   | [^][+] [Copy][Cut][Paste] [x][~][PC]                         |  tool bar
- *   | All Folders      | Contents of '/docs'                       |
+ *   | All Folders      | Contents of '/home/docs'                       |
  *   | [-] MiniWin      | Name        Size    Type    Modified      |  left: the folder tree (+/- to open and close)
  *   |   [+] docs       | NEWDOC.TXT  12 B    Text    26-10-25      |  right: the folder's contents, in columns
  *   |   [+] progs      | ...                                       |
@@ -20,7 +20,7 @@
  * moved and deleted here. The Disks view (View menu) is the old DISKS tab: the IDE disks and their partitions, and INSTALL, which
  * types `os-inst <id>` into MiniShell (the one place that asks for a confirmation and prints the progress).
  *
- * Two files are special because the rest of the OS is built around slots: /docs holds what Notepad and the desktop show, /progs what
+ * Two files are special because the rest of the OS is built around slots: /home/docs holds what Notepad and the desktop show, /progs what
  * Start menu and desktop run. Changing either folder from here goes through the slot API (fs_delete_slot, prog_delete_slot) or ends
  * with fx_resync_desktop() so the desktop icons never disagree with the disk.
  *
@@ -407,10 +407,20 @@ static void fx_row_path(const fx_row_t *r, char *out) {
     append_str(out, &l, VFS_PATH_MAX, r->name);
 }
 static int fx_cwd_is(const char *p) { return fx_namecmp(fx_cwd, p) == 0; }
+/* MiniFiles always works as a USER: the system directories (/boot /dev /etc /bin /lib /sys /proc /var, and the top level itself) can be looked at
+ * here but not changed -- that takes `root` in the terminal (vfs.h: vfs_priv). 1 = the open folder is one of those. */
+static int fx_cwd_ro(void) {
+    char p[VFS_PATH_MAX]; u32 l = 0; p[0] = 0;
+    append_str(p, &l, sizeof p, fx_cwd);
+    if (!(fx_cwd[0] == '/' && fx_cwd[1] == 0)) kstrcpy_append(p, &l, sizeof p, '/');
+    append_str(p, &l, sizeof p, "x");
+    return vfs_may_change(p) == MWFS_E_RO;
+}
 /* the folders the system itself stands on */
 static int fx_protected(const fx_row_t *r) {
     if (fx_cwd_is("/mnt")) return 1;
-    if (fx_cwd_is("/") && (!fx_namecmp(r->name, "docs") || !fx_namecmp(r->name, "progs") || !fx_namecmp(r->name, "mnt") || !fx_namecmp(r->name, "sys"))) return 1;
+    if (fx_cwd_is("/")) return 1;                              /* every top-level folder is part of the system's tree */
+    if (fx_cwd_is("/home") && (!fx_namecmp(r->name, "docs") || !fx_namecmp(r->name, "dwns") || !fx_namecmp(r->name, "start"))) return 1;
     return 0;
 }
 static void fx_resync_desktop(void) {
@@ -582,8 +592,8 @@ static void fx_open_row(int ri) {
         files_set_msg(why ? why : "Started in a window.");
         return;
     }
-    int slot = fx_cwd_is("/docs") ? fs_find_by_name(r->name) : -1;
-    if (slot < 0) { files_set_msg("Only files in /docs open in Notepad."); return; }
+    int slot = fx_cwd_is("/home/docs") ? fs_find_by_name(r->name) : -1;
+    if (slot < 0) { files_set_msg("Only files in /home/docs open in Notepad."); return; }
     open_document_slot(slot);                                    /* sets the desktop status line itself */
     files_set_msg("Opened in Notepad.");
 }
@@ -598,6 +608,7 @@ static void fx_delete_action(void) {
     if (fx_view_disks) return;
     if (files_sel < 0 || files_sel >= files_row_count) { files_set_msg("Select a file first."); return; }
     fx_row_t *r = &files_rows[files_sel];
+    if (fx_cwd_ro()) { files_set_msg(mwfs_err_text(MWFS_E_RO)); return; }
     if (fx_protected(r)) { files_set_msg("The system needs that folder."); return; }
     if (fx_armed != files_sel) {                                 /* first click: arm */
         fx_armed = files_sel;
@@ -609,7 +620,7 @@ static void fx_delete_action(void) {
     }
     char p[VFS_PATH_MAX]; fx_row_path(r, p);
     int e = MWFS_OK, keep = files_sel;
-    if (r->kind == FK_FILE && fx_cwd_is("/docs")) {
+    if (r->kind == FK_FILE && fx_cwd_is("/home/docs")) {
         int slot = fs_find_by_name(r->name);
         if (slot >= 0 && find_notepad_bound_to(slot) >= 0) { files_set_msg("It is open in Notepad."); fx_armed = -1; return; }
         if (slot >= 0) { if (!fs_delete_slot(slot)) e = MWFS_E_IO; } else e = vfs_rm(p);
@@ -632,6 +643,7 @@ static void fx_edit_open(const char *name) {
 static void fx_new_folder(void) {
     if (fx_view_disks) return;
     if (fx_cwd_is("/mnt")) { files_set_msg("Mount a partition there instead."); return; }
+    if (fx_cwd_ro()) { files_set_msg(mwfs_err_text(MWFS_E_RO)); return; }
     char name[FX_NAME], p[VFS_PATH_MAX];
     for (int n = 1; n < 100; n++) {
         u32 l = 0; name[0] = 0;
@@ -654,6 +666,7 @@ static void fx_new_folder(void) {
 static void fx_begin_rename(void) {
     if (fx_view_disks || files_sel < 0 || files_sel >= files_row_count) { files_set_msg("Select something first."); return; }
     fx_row_t *r = &files_rows[files_sel];
+    if (fx_cwd_ro()) { files_set_msg(mwfs_err_text(MWFS_E_RO)); return; }
     if (fx_protected(r)) { files_set_msg("The system needs that folder."); return; }
     fx_edit_open(r->name);
 }
@@ -668,7 +681,7 @@ static void fx_commit_rename(void) {
     kstrcpy(newname, fx_edit_buf, sizeof newname);
     fx_row_path(r, from);
     fx_row_t tmp; kstrcpy(tmp.name, newname, FX_NAME); fx_row_path(&tmp, to);
-    if (r->kind == FK_FILE && fx_cwd_is("/docs")) { int slot = fs_find_by_name(r->name); if (slot >= 0 && find_notepad_bound_to(slot) >= 0) { files_set_msg("It is open in Notepad."); return; } }
+    if (r->kind == FK_FILE && fx_cwd_is("/home/docs")) { int slot = fs_find_by_name(r->name); if (slot >= 0 && find_notepad_bound_to(slot) >= 0) { files_set_msg("It is open in Notepad."); return; } }
     vfs_node_t nd;
     if (vfs_stat(to, &nd) == MWFS_OK) { files_set_msg("That name is already used."); return; }
     int e = vfs_mv(from, to);
@@ -679,6 +692,7 @@ static void fx_commit_rename(void) {
 static void fx_copy_action(int cut) {
     if (fx_view_disks || files_sel < 0 || files_sel >= files_row_count) { files_set_msg("Select a file first."); return; }
     fx_row_t *r = &files_rows[files_sel];
+    if (cut && fx_cwd_ro()) { files_set_msg(mwfs_err_text(MWFS_E_RO)); return; }
     if (cut && fx_protected(r)) { files_set_msg("The system needs that folder."); return; }
     if (!cut && r->kind == FK_DIR) { files_set_msg("Folders can be moved (Cut), not copied."); return; }
     fx_row_path(r, fx_clip); fx_clip_cut = cut;
@@ -688,6 +702,7 @@ static void fx_paste_action(void) {
     if (fx_view_disks) return;
     if (!fx_clip[0]) { files_set_msg("Nothing to paste."); return; }
     if (fx_cwd_is("/mnt")) { files_set_msg("Cannot paste into /mnt."); return; }
+    if (fx_cwd_ro()) { files_set_msg(mwfs_err_text(MWFS_E_RO)); return; }
     int n = 0, last = 0; while (fx_clip[n]) { if (fx_clip[n] == '/') last = n; n++; }
     fx_row_t tmp; kstrcpy(tmp.name, fx_clip + last + 1, FX_NAME);
     char to[VFS_PATH_MAX]; fx_row_path(&tmp, to);
@@ -1027,6 +1042,7 @@ static void draw_files_window(void) {
             u32 cnt = fx_view_disks ? (u32)files_row_count : fx_ndirs + fx_nfiles;
             append_uint(a, &al, sizeof a, (int)cnt); append_str(a, &al, sizeof a, " object(s)");
             if (fx_truncated) append_str(a, &al, sizeof a, "+");
+            if (fx_cwd_ro()) append_str(a, &al, sizeof a, " - read-only");
         }
         if (!fx_view_disks) {
             if (sel_ok && files_rows[files_sel].kind == FK_FILE) fx_fmt_bytes(bq, &bl, sizeof bq, files_rows[files_sel].size);

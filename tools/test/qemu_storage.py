@@ -129,10 +129,10 @@ sys.path.insert(0, "tools")
 import mwfs
 try:
     fv = mwfs.Vol(FLOPPY, 2373, 315); fv.open()
-    docs = [n for n, _, _ in fv.entries(fv.walk("/docs"))]
+    docs = [n for n, _, _ in fv.entries(fv.walk("/home/docs"))]
 except Exception as e:
     docs = ["error: %s" % e]
-check("floppy: a Notepad save is written to the floppy (only the root volume changes, and the document is in /docs)",
+check("floppy: a Notepad save is written to the floppy (only the root volume changes, and the document is in /home/docs)",
       bool(changed) and min(changed) >= 2373 and "DOC.TXT" in docs, str(changed[:10]) + " " + str(docs))
 
 # ---- NVMe (QEMU's `nvme` device: one controller per -device, namespace 1 is the drive) ----

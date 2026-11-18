@@ -32,7 +32,7 @@ static int blk_write(int d, u32 lba, const void *buf) {
 #include "../../kernel/vfs.h"
 
 static int fails = 0, checks = 0;
-#define CHECK(c) do { checks++; if (!(c)) { fails++; printf("FAIL %s:%d  %s\n", __FILE__, __LINE__, #c); } } while (0)
+#define CHECK(c, ...) do { checks++; if (!(c)) { fails++; printf("FAIL %s:%d  %s  ", __FILE__, __LINE__, #c); printf(" " __VA_ARGS__); printf("\n"); } } while (0)
 
 static u32 rng = 12345;
 static u32 rnd(void) { rng = rng * 1664525u + 1013904223u; return rng >> 8; }
@@ -337,10 +337,10 @@ static void test_vfs(void) {
     CHECK(vfs_stat("/x/y/F.TXT", &n) == MWFS_OK && n.type == MWFS_T_FILE && vfs_size(&n) == 5);
     CHECK(vfs_chdir("f.txt") == MWFS_E_NOTDIR);
     CHECK(vfs_chdir("..") == MWFS_OK && strcmp(vfs_cwd, "/x") == 0);
-    CHECK(vfs_cp("y/f.txt", "/docs") == MWFS_OK);                        /* into a directory keeps the name */
-    CHECK(vfs_stat("/docs/f.txt", &n) == MWFS_OK);
-    CHECK(vfs_mv("/docs/f.txt", "/progs/g.txt") == MWFS_OK);
-    CHECK(vfs_stat("/docs/f.txt", &n) == MWFS_E_NOENT && vfs_stat("/progs/g.txt", &n) == MWFS_OK);
+    CHECK(vfs_cp("y/f.txt", "/home/docs") == MWFS_OK);                        /* into a directory keeps the name */
+    CHECK(vfs_stat("/home/docs/f.txt", &n) == MWFS_OK);
+    CHECK(vfs_mv("/home/docs/f.txt", "/progs/g.txt") == MWFS_OK);
+    CHECK(vfs_stat("/home/docs/f.txt", &n) == MWFS_E_NOENT && vfs_stat("/progs/g.txt", &n) == MWFS_OK);
     CHECK(vfs_rm("/x") == MWFS_E_NOTEMPTY);
     CHECK(vfs_rm("/") == MWFS_E_PERM && vfs_rm("/mnt") == MWFS_E_PERM);
     CHECK(vfs_mkdir("/mnt/foo") == MWFS_E_PERM);
@@ -352,9 +352,9 @@ static void test_vfs(void) {
     CHECK(vfs_write("/mnt/ide200/hello.txt", d, 5, 0) == MWFS_OK);
     CHECK(vfs_mkdir("/mnt/ide200/sub") == MWFS_OK);
     CHECK(vfs_cp("/x/y/f.txt", "/mnt/ide200/sub/copy.txt") == MWFS_OK);   /* across volumes */
-    CHECK(vfs_mv("/mnt/ide200/sub/copy.txt", "/docs/moved.txt") == MWFS_OK);
-    CHECK(vfs_stat("/mnt/ide200/sub/copy.txt", &n) == MWFS_E_NOENT && vfs_stat("/docs/moved.txt", &n) == MWFS_OK && vfs_size(&n) == 5);
-    CHECK(vfs_mv("/mnt/ide200/sub", "/docs/sub") == MWFS_E_XDEV);
+    CHECK(vfs_mv("/mnt/ide200/sub/copy.txt", "/home/docs/moved.txt") == MWFS_OK);
+    CHECK(vfs_stat("/mnt/ide200/sub/copy.txt", &n) == MWFS_E_NOENT && vfs_stat("/home/docs/moved.txt", &n) == MWFS_OK && vfs_size(&n) == 5);
+    CHECK(vfs_mv("/mnt/ide200/sub", "/home/docs/sub") == MWFS_E_XDEV);
     mwfs_dirent_t e; vfs_node_t mnt;
     CHECK(vfs_stat("/mnt", &mnt) == MWFS_OK && mnt.is_mnt_dir);
     CHECK(vfs_ls_nth(&mnt, 0, &e) == 1 && strcmp(e.name, "ide200") == 0 && vfs_ls_nth(&mnt, 1, &e) == 0);
@@ -391,11 +391,11 @@ static void test_python_image(void) {
     CHECK(vfs_size(&nd) > 100);
     mwfs_ino_t t; CHECK(mwfs_ino_get(&vfs_vols[0], nd.ino, &t) && t.aux == 0);
     CHECK(mwfs_file_verify(&vfs_vols[0], nd.ino));
-    CHECK(vfs_stat("/docs", &nd) == MWFS_OK && vfs_stat("/mnt", &nd) == MWFS_OK && vfs_stat("/sys", &nd) == MWFS_OK);
+    CHECK(vfs_stat("/home/docs", &nd) == MWFS_OK && vfs_stat("/home/dwns", &nd) == MWFS_OK && vfs_stat("/mnt", &nd) == MWFS_OK && vfs_stat("/sys", &nd) == MWFS_OK && vfs_stat("/etc", &nd) == MWFS_OK);
     CHECK(clean(&vfs_vols[0], 0));
     /* and the kernel can write to it */
     u8 d[4] = { 1, 2, 3, 4 };
-    CHECK(vfs_write("/docs/NEW.TXT", d, 4, 0) == MWFS_OK);
+    CHECK(vfs_write("/home/docs/NEW.TXT", d, 4, 0) == MWFS_OK);
     CHECK(clean(&vfs_vols[0], 0));
 }
 
@@ -435,10 +435,67 @@ static void test_hangul_names(void) {
     CHECK(!mwfs_name_ok(" \xea\xb0\x80") && !mwfs_name_ok("\xea\xb0\x80 ") && !mwfs_name_ok(".\xea\xb0\x80"));
 }
 
+/* The standard tree, the read-only system directories and the move of a volume made before them. */
+static int top_count(void) { mwfs_dirent_t e; int n = 0; while (mwfs_dir_nth(&vfs_vols[0], MWFS_ROOT_INO, (u32)n, &e) == 1) n++; return n; }
+static void test_system_dirs(void) {
+    memset(disk, 0, (size_t)DISK_SECTORS * 512);
+    memset(vfs_vols, 0, sizeof vfs_vols); vfs_root_err = MWFS_E_NOFS; vfs_mnt_ino = 0;
+    mwfs_vol_t m; memset(&m, 0, sizeof m); m.dev = 0; m.base = 100; m.sectors = 20000;
+    CHECK(mwfs_mkfs(&m, "ROOT") == MWFS_OK);
+    CHECK(vfs_mount_root(0, 100, 20000) == MWFS_OK);
+    vfs_node_t n;
+    static const char *const tree[] = { "/boot", "/dev", "/etc", "/bin", "/lib", "/sys", "/proc", "/mnt", "/tmp", "/var", "/home", "/home/docs", "/home/dwns", "/progs" };
+    for (unsigned i = 0; i < sizeof tree / sizeof *tree; i++) CHECK(vfs_stat(tree[i], &n) == MWFS_OK && n.type == MWFS_T_DIR, "%s exists", tree[i]);
+    CHECK(top_count() == 12, "12 top-level directories (%d)", top_count());
+    CHECK(vfs_stat("/docs", &n) == MWFS_E_NOENT && vfs_stat("/start", &n) == MWFS_E_NOENT, "no old top-level /docs or /start");
+    CHECK(clean(&vfs_vols[0], 0));
+
+    u8 d[4] = { 1, 2, 3, 4 };
+    vfs_priv = 0;                                                       /* a user: MiniFiles, Notepad, programs, a user's terminal */
+    CHECK(vfs_write("/etc/X.CFG", d, 4, 0) == MWFS_E_RO, "a user cannot write into /etc");
+    CHECK(vfs_mkdir("/lib/sub") == MWFS_E_RO && vfs_mkdir("/boot/a") == MWFS_E_RO && vfs_mkdir("/var/log") == MWFS_E_RO, "nor make folders in /lib /boot /var");
+    CHECK(vfs_mkdir("/newtop") == MWFS_E_RO && vfs_write("/top.txt", d, 4, 0) == MWFS_E_RO, "nor add anything to the top level");
+    CHECK(vfs_rm("/home") == MWFS_E_RO && vfs_rm("/progs") == MWFS_E_RO && vfs_rm("/tmp") == MWFS_E_RO, "nor remove a top-level directory");
+    CHECK(vfs_mv("/tmp", "/tmp2") == MWFS_E_RO, "nor rename one");
+    CHECK(vfs_write("/ETC/Y.CFG", d, 4, 0) == MWFS_E_RO && vfs_write("/etc/../etc/Z", d, 4, 0) == MWFS_E_RO, "case and .. do not get around it");
+    CHECK(vfs_stat("/etc", &n) == MWFS_OK && vfs_ls_each(&n, 0, 0) >= 0, "but a user can look");
+    CHECK(vfs_write("/home/docs/A.TXT", d, 4, 0) == MWFS_OK && vfs_write("/home/dwns/B.TXT", d, 4, 0) == MWFS_OK, "/home is open");
+    CHECK(vfs_write("/tmp/T.TXT", d, 4, 0) == MWFS_OK && vfs_write("/progs/P.TXT", d, 4, 0) == MWFS_OK && vfs_mkdir("/tmp/sub") == MWFS_OK, "/tmp and /progs are open");
+    CHECK(vfs_cp("/home/docs/A.TXT", "/etc") == MWFS_E_RO && vfs_cp("/home/docs/A.TXT", "/etc/A.TXT") == MWFS_E_RO, "copying into /etc is refused");
+    CHECK(vfs_cp("/home/docs/A.TXT", "/tmp") == MWFS_OK, "copying into /tmp is not");
+    vfs_priv = 1;                                                       /* root in the terminal */
+    CHECK(vfs_write("/etc/X.CFG", d, 4, 0) == MWFS_OK && vfs_mkdir("/lib/sub") == MWFS_OK && vfs_mkdir("/newtop") == MWFS_OK, "root can");
+    CHECK(vfs_mv("/etc/X.CFG", "/lib/sub") == MWFS_OK && vfs_rm("/lib/sub/X.CFG") == MWFS_OK && vfs_rm("/lib/sub") == MWFS_OK && vfs_rm("/newtop") == MWFS_OK, "move and remove too");
+    vfs_priv = 0;
+    CHECK(vfs_write("/etc/X.CFG", d, 4, 0) == MWFS_E_RO, "and a user is refused again afterwards");
+    vfs_priv = 1;
+    CHECK(clean(&vfs_vols[0], 0));
+
+    /* a volume made before the tree: /docs and /start at the top, the root password in /sys */
+    memset(disk, 0, (size_t)DISK_SECTORS * 512);
+    memset(vfs_vols, 0, sizeof vfs_vols); vfs_root_err = MWFS_E_NOFS; vfs_mnt_ino = 0;
+    memset(&m, 0, sizeof m); m.dev = 0; m.base = 100; m.sectors = 20000;
+    CHECK(mwfs_mkfs(&m, "ROOT") == MWFS_OK);
+    mwfs_vol_t *v = &vfs_vols[0];
+    v->dev = 0; v->base = 100; v->sectors = 20000; CHECK(mwfs_open(v) == MWFS_OK);
+    u32 di, si, sy, i2;
+    CHECK(mwfs_mkdir(v, MWFS_ROOT_INO, "docs", &di) == MWFS_OK && mwfs_mkdir(v, MWFS_ROOT_INO, "start", &si) == MWFS_OK && mwfs_mkdir(v, MWFS_ROOT_INO, "sys", &sy) == MWFS_OK);
+    CHECK(mwfs_mkdir(v, MWFS_ROOT_INO, "progs", &i2) == MWFS_OK && mwfs_mkdir(v, MWFS_ROOT_INO, "mnt", &i2) == MWFS_OK);
+    CHECK(mwfs_file_put(v, di, "OLD.TXT", d, 4, 0) == MWFS_OK && mwfs_file_put(v, si, "X.LNK", d, 4, 0) == MWFS_OK && mwfs_file_put(v, sy, "ROOT.PWD", d, 4, 0) == MWFS_OK);
+    memset(v, 0, sizeof *v);
+    CHECK(vfs_mount_root(0, 100, 20000) == MWFS_OK);
+    CHECK(vfs_stat("/home/docs/OLD.TXT", &n) == MWFS_OK && vfs_stat("/home/start/X.LNK", &n) == MWFS_OK && vfs_stat("/etc/ROOT.PWD", &n) == MWFS_OK, "an old volume's documents, shortcuts and password moved into the tree");
+    CHECK(vfs_stat("/docs", &n) == MWFS_E_NOENT && vfs_stat("/start", &n) == MWFS_E_NOENT && vfs_stat("/sys/ROOT.PWD", &n) == MWFS_E_NOENT, "and nothing is left behind");
+    CHECK(vfs_mount_root(0, 100, 20000) == MWFS_OK && vfs_stat("/home/docs/OLD.TXT", &n) == MWFS_OK && top_count() == 12, "mounting again changes nothing");
+    CHECK(clean(&vfs_vols[0], 0));
+    vfs_priv = 0;
+}
+
 int main(void) {
     test_hangul_names();
     disk = calloc(DISK_SECTORS, 512);
-    test_basic(); test_dirs(); test_full(); test_random(); test_crash(); test_vfs(); test_python_image(); test_open_errors();
+    vfs_priv = 1;                                                       /* the tests play the kernel: test_system_dirs() is where the user rules are tried */
+    test_basic(); test_dirs(); test_full(); test_random(); test_crash(); test_vfs(); test_python_image(); test_open_errors(); test_system_dirs();
     printf("%d checks, %d failed\n", checks, fails);
     return fails ? 1 : 0;
 }

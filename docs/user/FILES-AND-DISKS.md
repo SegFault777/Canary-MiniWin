@@ -5,11 +5,26 @@
 MiniWin has a real file system, **MWFS**: directories inside directories, files that can be created, copied, moved and deleted,
 and as many documents and programs as the disk has room for (the four-document limit of the early versions is gone).
 
-* `/` is the system's own disk. Its standard folders are `/docs` (your documents), `/progs` (programs, the `.MWP` files), `/mnt`
-  (other disks, see below) and `/sys`.
+* `/` is the system's own disk. It has a fixed set of folders, like a Unix system:
+
+  | folder | what it is | who may change it |
+  |---|---|---|
+  | `/boot` `/dev` `/etc` `/bin` `/lib` `/sys` `/proc` | boot files, devices, settings (`/etc` holds the root password), programs and libraries of the system, kernel information | **root only** |
+  | `/var` | logs, caches, state | **root only** |
+  | `/home/docs` | your documents (what Notepad saves and the desktop shows) | everyone |
+  | `/home/dwns` | downloads | everyone |
+  | `/home/start` | the shortcuts of the Start menu | everyone |
+  | `/progs` | the programs of the system, the `.MWP` files | everyone |
+  | `/tmp` | scratch files | everyone |
+  | `/mnt` | where other disks are mounted (see below) | `part mount` |
+
+  Anyone can **look** at every folder. **MiniFiles, Notepad and programs always work as a user**: in the root-only folders, and at the
+  top level of `/` itself, they can only show things (MiniFiles says *read-only* in the status bar). To change those you open
+  **MiniShell**, type `root` (the first time you choose the root password), `cd` to the folder and work there; `user` gives the
+  privilege back. The top-level folders themselves cannot be renamed or deleted by a user either.
 * **MiniShell** is where you move around: `ls`, `cd`, `pwd`, `mkdir`, `cat`, `cp`, `mv`, `rm`, `touch`. The prompt always shows
-  where you are (`/docs~#`). See [TERMINAL.md](TERMINAL.md).
-* Notepad saves into `/docs`; the documents (up to 64 of them are shown) appear as desktop icons and in MiniFiles. A document can
+  where you are (`/home/docs~#`). See [TERMINAL.md](TERMINAL.md).
+* Notepad saves into `/home/docs`; the documents (up to 64 of them are shown) appear as desktop icons and in MiniFiles. A document can
   be up to 4 KB, a program up to 24 KB.
 * Programs are put into a disk image *before* it is started, with the tools in `tools/` (see [MWP-PROGRAMS.md](../dev/MWP-PROGRAMS.md)),
   or copied into `/progs` with `cp`; they appear as desktop icons, in MiniFiles and in `apps`, and run -- in a window -- with a double-click or `run <name>`.
@@ -25,7 +40,7 @@ Any partition or whole disk MiniWin can see can get its own MWFS volume and be a
     part list                  # what disks and partitions there are
     part format ide202         # an empty MWFS volume (asks YES: everything on it is erased)
     part mount ide202          # it now appears as /mnt/ide202
-    cp /docs/NOTE.TXT /mnt/ide202
+    cp /home/docs/NOTE.TXT /mnt/ide202
     part unmount ide202
 
 `part` can also look at a partition (`info`), check a volume (`check`, `check ... fix`), and on MBR disks create, delete, set the

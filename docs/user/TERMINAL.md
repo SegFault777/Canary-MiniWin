@@ -3,7 +3,7 @@
 Open it with **MINISHELL** on the desktop. It is 40 characters wide and 14 lines tall; the **Up/Down** keys, the mouse wheel and
 the scroll bar scroll back through what it printed. Type a command and press Enter.
 
-The **prompt shows where you are**: `/docs~# ` means you are in the directory `/docs`, `/mnt/ide202/photos~# ` in a folder of a
+The **prompt shows where you are**: `/home/docs~# ` means you are in the directory `/home/docs`, `/mnt/ide202/photos~# ` in a folder of a
 mounted disk. A long path keeps its end (`.../x/y/z~# `).
 
 The menu bar has **Shell** (clear the screen, the command list, close), **View** (scroll), **Tools** (disks, the directory you are in,
@@ -11,7 +11,12 @@ USB devices, the time) and **Help**; every Tools item simply types the command f
 
 ## Files and directories
 
-Paths are absolute (`/docs/NOTE.TXT`) or relative to the current directory, may use `.` and `..`, and are not case-sensitive. The names
+**User and root.** MiniShell starts as a *user* (prompt ends in `$`). `root` asks for the root password (the first time it asks you to choose
+one) and makes the session root (prompt ends in `#`); `user` goes back. Root may change the system folders (`/boot /dev /etc /bin /lib /sys
+/proc /var` and the top level of `/`) that MiniFiles and programs can only look at, see [FILES-AND-DISKS.md](FILES-AND-DISKS.md). A user
+who tries gets *read-only: only root can change this*.
+
+Paths are absolute (`/home/docs/NOTE.TXT`) or relative to the current directory, may use `.` and `..`, and are not case-sensitive. The names
 are the familiar Unix ones; the Windows ones work too (shown in brackets), and MiniWin's own short names are accepted as well.
 
 | command | what it does |
@@ -22,7 +27,7 @@ are the familiar Unix ones; the Windows ones work too (shown in brackets), and M
 | `mkdir <dir>` (`md`, `dig`) | make a directory (the parent must exist) |
 | `touch <file>` (`new`) | make an empty file if it does not exist |
 | `cat <file>` (`type`) | show a text file, up to 4 KB (a binary file is only described) |
-| `cp <a> <b>` (`copy`, `dup`) | copy a file; `cp a /docs` copies into the directory; works between disks |
+| `cp <a> <b>` (`copy`, `dup`) | copy a file; `cp a /home/docs` copies into the directory; works between disks |
 | `mv <a> <b>` (`move`) | move or rename; between disks a file is copied and then removed; directories cannot cross disks |
 | `rm <path>` (`del <path>`) | delete a file or an **empty** directory. There is no undo. `/`, `/mnt` and the mounted disks cannot be removed |
 

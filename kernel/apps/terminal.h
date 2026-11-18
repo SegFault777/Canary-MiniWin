@@ -191,10 +191,10 @@ static int term_cmd_is(const char *typed, const char *names) {
  *     shown as *), stores it, and the session is root.
  *   - Closing the window ends the session. The next time MiniShell is opened it starts as a USER, and the command `root` asks for the
  *     password and makes it root; `user` goes back.
- * The password is kept in /sys/ROOT.PWD as 16 bytes of salt and a SHA-256 hash of salt + password, stretched over 1000 rounds, both in
+ * The password is kept in /etc/ROOT.PWD as 16 bytes of salt and a SHA-256 hash of salt + password, stretched over 1000 rounds, both in
  * hex (96 characters): the password itself is never written anywhere. Nothing here stops someone who can write the disk image from
  * deleting that file -- no password scheme can, without encrypting the volume. ============================================================ */
-#define TERM_PW_FILE "/sys/ROOT.PWD"
+#define TERM_PW_FILE "/etc/ROOT.PWD"
 enum { TP_NONE, TP_NEW, TP_CONFIRM, TP_LOGIN };           /* what the input line is asking for */
 static int  term_pw_mode = TP_NONE;                       /* TP_NONE: an ordinary command line */
 static char term_pw_first[TERM_INPUT_MAXLEN + 1];         /* the first entry, while the confirmation is being typed */
@@ -239,7 +239,10 @@ static int term_pw_store(const char *pw) {
     tls_rng_mix_hw(); tls_rng_bytes(salt, 16);
     term_pw_hash(salt, pw, h);
     term_pw_hex(file, salt, 16); term_pw_hex(file + 32, h, 32);
-    return vfs_write(TERM_PW_FILE, (const u8 *)file, 96, 0) == MWFS_OK;
+    int was = vfs_priv; vfs_priv = 1;                      /* /etc is a system directory; choosing the first root password is how one gets in */
+    int ok = vfs_write(TERM_PW_FILE, (const u8 *)file, 96, 0) == MWFS_OK;
+    vfs_priv = was;
+    return ok;
 }
 
 static void term_session_end(void) {                      /* the window was closed */
@@ -875,7 +878,11 @@ static void term_install_poll(void) {
  * itself into the scrollback first (so the transcript reads like a
  * real session -- prompt, command, output -- rather than just output
  * with no record of what triggered it), then clears the input line. */
-static void term_run_input(void) {
+static void term_run_input_inner(void);
+/* The commands of a root session may change the system directories (vfs_priv), those of a user session may not; programs started from here run
+ * later, as users. */
+static void term_run_input(void) { vfs_priv = term_is_root; term_run_input_inner(); vfs_priv = 0; }
+static void term_run_input_inner(void) {
     char echoed[TERM_COLS + 1]; u32 el = 0;
     if (term_pw_mode != TP_NONE) { term_pw_submit(); return; }          /* a password is being typed: not a command, and never echoed */
     char prompt[40];

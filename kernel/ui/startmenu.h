@@ -104,7 +104,7 @@ static void draw_power_menu(int mx, int my) {
 static const u8 start_menu_icons[6] = { IC_NOTEPAD, IC_SETTING, IC_WEB, IC_TERM, IC_FILES, IC_FOLDER };
 
 /* ================================================================ the Programs flyouts (1.1-alpha-14)
- * "Programs >" opens a flyout that lists /start on the root volume: sub-folders (which open the next flyout to the right, two levels
+ * "Programs >" opens a flyout that lists /home/start on the root volume: sub-folders (which open the next flyout to the right, two levels
  * of folders at most) and shortcuts (NAME.LNK files, shown without the extension). A shortcut is a tiny text file -- "app:NOTEPAD"
  * or "prog:HELLO.MWP" -- made by the "Add..." wizard at the bottom of the first flyout (apps/startmenu_add.h), which also creates
  * the folders. The lists are read when a flyout opens, not every frame (the disk is slow). Like the power flyout they open on a click. */
@@ -120,7 +120,7 @@ static int  sm_depth = 0;                /* how many flyouts are showing (0 = no
 static char sm_target[112];              /* the .LNK a click chose (sm_click() == 2) */
 
 static void sm_path(int lv, char *out, int max) {
-    int n = 0; const char *r = "/start";
+    int n = 0; const char *r = "/home/start";
     while (*r && n < max - 1) out[n++] = *r++;
     for (int i = 0; i < lv; i++) {
         if (n < max - 1) out[n++] = '/';

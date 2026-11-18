@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """mwfs.py -- the offline twin of kernel/mwfs.h: format an MWFS volume inside an image file and put files in it.
 
-The build uses it to give the stock image its root filesystem ("/" with /docs /progs /mnt /sys) and to install programs
+The build uses it to give the stock image its root filesystem ("/" with the directory tree of kernel/vfs.h) and to install programs
 (tools/install_mwp.py); the kernel does the same things at run time with the C code. The two are kept byte-compatible --
 tools/test/run_host_mwfs.sh formats an image with THIS script and then opens, lists and checks it with the C code.
 
@@ -234,6 +234,13 @@ class Vol:
                     self.wr(lba, b)
                     return
 
+    def mkpath(self, path):
+        dino = 1
+        for part in [p for p in path.split("/") if p]:
+            r = self.lookup(dino, part)
+            dino = r[0] if r else self.mkdir(dino, part)
+        return dino
+
     def put(self, path, data, aux=0):
         parent, _, name = path.rstrip("/").rpartition("/")
         dino = self.walk(parent)
@@ -246,6 +253,10 @@ class Vol:
         self.add_entry(dino, name, n, T_FILE)
 
 
+# The standard tree of a root volume: the same list as vfs_root_dirs[] in kernel/vfs.h (a name with a '/' lies inside the one before it).
+DEFAULT_DIRS = "boot,dev,etc,bin,lib,sys,proc,mnt,tmp,var,home,home/docs,home/dwns,progs"
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("cmd", choices=["format", "put", "ls"])
@@ -254,7 +265,7 @@ def main():
     ap.add_argument("--lba", type=int, required=True)
     ap.add_argument("--sectors", type=int, required=True)
     ap.add_argument("--label", default="MINIWIN")
-    ap.add_argument("--dirs", default="docs,progs,mnt,sys")
+    ap.add_argument("--dirs", default=DEFAULT_DIRS)
     ap.add_argument("--path", default="/")
     ap.add_argument("--aux", type=int, default=0)
     a = ap.parse_args()
@@ -262,7 +273,7 @@ def main():
     if a.cmd == "format":
         v.mkfs(a.label)
         for d in [x for x in a.dirs.split(",") if x]:
-            v.mkdir(1, d)
+            v.mkpath(d)
         print(f"mwfs.py: formatted {a.sectors} sectors at LBA {a.lba} ({v.inode_count} inodes)")
     else:
         v.open()

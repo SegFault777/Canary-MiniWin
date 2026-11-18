@@ -4,8 +4,8 @@
 
 /* apps/startmenu_add.h -- start-menu shortcuts and folders (1.1-alpha-14): running a shortcut, and the "Add..." wizard.
  *
- * A shortcut is a small text file NAME.LNK somewhere under /start on the root volume: "app:NOTEPAD" (also SETTING, WEB, TERM, FILES)
- * for a built-in program, "prog:NAME.MWP" for a file in /progs. A folder of the Programs menu is a directory under /start. The
+ * A shortcut is a small text file NAME.LNK somewhere under /home/start on the root volume: "app:NOTEPAD" (also SETTING, WEB, TERM, FILES)
+ * for a built-in program, "prog:NAME.MWP" for a file in /progs. A folder of the Programs menu is a directory under /home/start. The
  * menus themselves (ui/startmenu.h) only read them.
  *
  * The wizard follows the Windows 95 "Select Program Folder" dialog: step 1 picks the program, step 2 picks the folder -- a tree
@@ -111,10 +111,10 @@ static void sma_scan_dirs(const char *path, int depth) {            /* the folde
     }
 }
 static void sma_scan_tree(void) {
-    vfs_mkdir("/start");                                             /* the first use makes it (an existing one just says so) */
+    vfs_mkdir("/home/start");                                             /* the first use makes it (an existing one just says so) */
     sma_nd = 0;
-    sma_add_dir("/start", "Start Menu", 0);
-    sma_scan_dirs("/start", 1);
+    sma_add_dir("/home/start", "Start Menu", 0);
+    sma_scan_dirs("/home/start", 1);
 }
 
 static const char *sma_errtext(int e) {

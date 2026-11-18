@@ -65,10 +65,19 @@ and by `tools/install_mwp.py` to put programs in it; the host test opens an imag
 `kernel/vfs.h` gives the volumes one namespace: `/` is the root volume, `/mnt/<id>` any mounted volume (`ide200`, `sata101`, ...),
 paths are absolute or relative to the shell's current directory, may use `.` and `..`, and nest as deep as the 96-character path
 buffer allows. `/mnt` is a real, empty directory on the root volume; what `ls /mnt` shows is the mount table, which exists only in
-RAM (mounting is a choice, not a setting). The root volume has `/docs`, `/progs`, `/mnt` and `/sys`.
+RAM (mounting is a choice, not a setting). The root volume has the standard tree of `vfs_root_dirs[]` in `kernel/vfs.h` (`tools/mwfs.py` formats the stock image with the same list):
+`/boot /dev /etc /bin /lib /sys /proc /mnt /tmp /var /home /progs`, and inside `/home`: `docs`, `dwns`, `start`. Mounting an older volume
+moves its `/docs` and `/start` into `/home` and its `/sys/ROOT.PWD` into `/etc` (a rename, at every mount, nothing once done).
+
+**Who may change what.** `vfs_priv` (kernel/vfs.h) is 0 for everyone but a root session of MiniShell, which sets it while a command runs
+(`term_run_input`). While it is 0, `vfs_mkdir`, `vfs_write`, `vfs_rm`, `vfs_cp` and `vfs_mv` refuse (`MWFS_E_RO`) any path that is `/` itself,
+a top-level entry, or inside `/boot /dev /etc /bin /lib /sys /proc /var` (`vfs_is_sys_path`, case-insensitive, after `.`/`..` are resolved).
+Reading is never restricted. MiniFiles, Notepad's Save As and programs (including Ring 3 ones) go through the same calls, so they are
+users. Code that must write there itself (choosing the first root password) raises `vfs_priv` for the call only. Volumes under `/mnt` are
+other filesystems and not covered.
 
 `fs.h` keeps the **slot API** the desktop, Notepad, MiniFiles and the shell were written against, as a thin layer: slot *n* is
-the *n*-th entry of a cache of `/docs` (up to `FS_MAX_FILES` = 64) or `/progs` (up to `PROG_MAX_SLOTS` = 32), so a window that
+the *n*-th entry of a cache of `/home/docs` (up to `FS_MAX_FILES` = 64) or `/progs` (up to `PROG_MAX_SLOTS` = 32), so a window that
 points at "document 3" keeps working while the bytes live in ordinary files. A document is still at most
 `FS_MAX_FILE_BYTES` = 4096 bytes because that is what Notepad's buffer holds; a program is at most `PROG_MAX_BYTES` = 24576.
 `fs_rescan_docs()` / `fs_rescan_progs()` re-read the directories (boot does, and so do the shell commands that change them).
