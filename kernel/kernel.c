@@ -100,6 +100,9 @@ static u32 desktop_fg = TH_DESKTOP_TEXT;
 #include "ui/startmenu.h"
 #include "apps/notepad/draw.h"
 #include "ui/cursor.h"   /* the pointer shapes and trails: Settings > Mouse draws them, so it comes before it */
+#include "fontpack.h"        /* the font pack reader: Galmuri11 (and later the other faces) from the system area of the disk */
+#include "fontface.h"        /* switching the system font face at run time (Control Panel > Font) */
+#include "ttf.h"             /* the TrueType rasterizer: a .ttf becomes a face (the Fonts folder's "Install New Font", not wired up yet) */
 #include "apps/setting.h"
 #include "apps/web/state.h"
 #include "apps/web/address.h"
@@ -122,7 +125,6 @@ static u32 desktop_fg = TH_DESKTOP_TEXT;
 #include "sys/power.h"
 #include "apps/installer.h"  /* the live disc's INSTALL window (needs progwin.h, power.h, terminal.h, os_inst.h) */
 #include "apps/startmenu_add.h"  /* start-menu shortcuts and the Add... wizard (needs installer.h's helpers, progwin.h, vfs.h) */
-#include "fontpack.h"        /* the font pack reader: Galmuri11 (and later the other faces) from the system area of the disk */
 #include "sys/boot.h"
 #include "ring3.h"           /* programs in ring 3: the int 0x80 gate, user pages, the syscall dispatcher (needs paging.h, progwin.h, mwp_api2.h and the menu actions below) */
 #include "ui/ctxmenu_actions.h"  /* what the right-click menus hold and do (needs MiniFiles, the Start-menu wizard, the desktop icons) */

@@ -46,7 +46,7 @@
 #define ICONI_X           (VGA_WIDTH - ICON_SLOT_W - ICON_X)
 #define ICONI_Y           (DESK_BOTTOM_Y - ICON_H)
 #define DESK_BUILTIN_COUNT 5                                   /* NOTEPAD, SETTING, WEB, TERMINAL, MINIFILES */
-#define ICON_H   (ICON_GLYPH_H + 4 + 11 + 1 + 11)   /* glyph + gap + two label lines */
+#define ICON_H   (ICON_GLYPH_H + 4 + FONT_CELL + 1 + FONT_CELL)   /* glyph + gap + two label lines of the system font (59 with the 11-pixel face) */
 
 /* ------------------------------------------------------------
  * Icon cache: the 32x32 bitmap icons installed on disk by

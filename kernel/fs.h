@@ -16,7 +16,7 @@
  * Notepad's windows, the desktop icons and MiniFiles' rows keep pointing at "document 3" the way they always did, while the
  * bytes live in ordinary files you can also reach with ls/cat/cp/mv in MiniShell.
  *
- * Disk layout (LBA = sector, 512 bytes; the install image is exactly 1 MB = 2048 sectors):
+ * Disk layout (LBA = sector, 512 bytes; the install image is exactly 1344 KB = 2688 sectors):
  *   LBA 0        boot sector (stage 1, boot/boot.asm)
  *   LBA 1-4      stage 2 (boot/stage2.asm: kernel loading, VBE mode search, A20, GDT, the jump to protected mode)
  *   LBA 5-1028   the kernel (512 KB budget; boot/stage2.asm's KERNEL_CHUNKS is the loader's side of this number)
@@ -33,7 +33,7 @@
 #define MW_FONT_LBA            1733u         /* the font pack (tools/gen_font_pack.py); relative to the installation's first sector */
 #define MW_FONT_SECTORS         640u
 #define MW_ROOTFS_LBA          2373u         /* relative to the installation's first sector */
-#define MW_ROOTFS_STOCK_SECTORS 315u         /* what the stock 1 MB image has left after the catalog */
+#define MW_ROOTFS_STOCK_SECTORS 315u         /* what the stock 1344 KB image has left after the font pack */
 
 #define FS_MAX_FILE_BYTES  4096              /* a document: what Notepad's buffer holds. Bigger files are fine in the filesystem, just not in Notepad */
 #define FS_MAX_FILES       64                /* how many documents the desktop/Notepad/MiniFiles index (more can exist; ls shows all) */
@@ -289,7 +289,7 @@ static inline int prog_delete_slot(int slot) {
  * ============================================================ */
 #define ICON_BASE_LBA        1029
 #define ICON_SLOT_SECTORS    11    /* 1 header + 8 data (32x32) + 2 data (16x16) */
-#define ICON_MAX_SLOTS       64    /* the "lite" icon set (tools/icon_sets/lite.txt, 54 icons) leaves 10 free; the bundle has 74 usable icons -- see the full set */
+#define ICON_MAX_SLOTS       64    /* the "lite" icon set (tools/icon_sets/lite.txt, 55 icons) leaves 9 free; the bundle has 74 usable icons -- see the full set */
 #define ICON_NAME_MAXLEN     28    /* e.g. "PERSONALIZATION_OR_DISPLAY" (26) -- the header sector has room for far more */
 
 #define ICON_32_BYTES  (32 * 32 * 4)  /* 4096 bytes -- exactly 8 sectors, no padding */

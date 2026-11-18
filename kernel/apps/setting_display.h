@@ -48,15 +48,34 @@ static int disp_confirm_left(void) {
     int e = (int)((disp_secs_now() + 86400u - disp_confirm_start) % 86400u);
     return e >= DISP_CONFIRM_SECS ? 0 : DISP_CONFIRM_SECS - e;
 }
-static void disp_keep(void) { int v; if (disp_read_byte(&v)) disp_write_byte(disp_unavail ? 0 : (u8)(v & ~DISP_PENDING)); disp_confirm_open = 0; disp_unavail = 0; }   /* (an unavailable size is forgotten: the byte goes back to 640x480) */
-static void disp_revert(void) { disp_confirm_open = 0; disp_write_byte(0); disp_black_and_restart(); }     /* back to 640x480 */
+static void disp_keep(void) { int v; if (disp_read_byte(&v)) disp_write_byte(disp_unavail ? (u8)(fontface_pref << 2) : (u8)(v & ~DISP_PENDING)); disp_confirm_open = 0; disp_unavail = 0; }   /* (an unavailable size is forgotten: the byte goes back to 640x480) */
+static void disp_revert(void) { disp_confirm_open = 0; disp_write_byte((u8)(fontface_pref << 2)); disp_black_and_restart(); }     /* back to 640x480 */
+/* ---- the system font face is kept in the same byte (bits 2-4: pack index + 1, 0 = the default) ---- */
+/* At boot: the face the byte names; with none chosen, a 320 x 200 screen starts on the 7-pixel face (more fits), anything else on the built-in 11. */
+static void fontface_boot_apply(int pref) {
+    fontface_init_order();
+    if (fp_n < 2) return;                                                               /* the floppy's pack has one face: nothing to switch */
+    int idx = -1;
+    if (pref >= 1 && pref - 1 < fp_n) { idx = pref - 1; fontface_pref = pref; }
+    else if (VGA_WIDTH <= 320) idx = fontface_find(7, 0);
+    if (idx > 0) fontface_use(idx);
+}
+/* Writes the choice into the boot sector. 0 = it could not be written (the live disc): the face still holds until the next restart. */
+static int fontface_save_pref(void) {
+    int v;
+    if (!disp_read_byte(&v)) return 0;
+    return disp_write_byte((u8)((v & ~0x1C) | ((fontface_pref & 7) << 2)));
+}
+
 /* Once per frame (render_frame): the first call looks at the boot sector; while the question is open, the time runs out here. */
 static void disp_tick(void) {
     if (!disp_boot_checked) {
         disp_boot_checked = 1;
         int v;
-        if (disp_read_byte(&v) && (v & DISP_PENDING)) {
-            int req = v & 0x7F, run = disp_size_pos() == 0 ? 1 : disp_size_pos() == 2 ? 2 : 0;
+        int have = disp_read_byte(&v);
+        fontface_boot_apply(have ? (v >> 2) & 7 : 0);                                      /* the system font the user chose (or the default for this screen) */
+        if (have && (v & DISP_PENDING)) {
+            int req = v & 0x03, run = disp_size_pos() == 0 ? 1 : disp_size_pos() == 2 ? 2 : 0;
             disp_confirm_open = 1; disp_confirm_start = disp_secs_now();
             if ((req == 1 || req == 2) && req != run) disp_unavail = 1;                  /* stage 2 had to fall back to 640x480 */
         }
@@ -273,7 +292,7 @@ static void dp_fire(int b) {
     else if (b == 3) dp_apply();
     else if (b == 12) { dp_ask = 0; dp_p_pos = disp_size_pos(); }
     else if (b == 11) {
-        if (disp_write_byte(disp_pos_to_byte(dp_p_pos) | DISP_PENDING)) disp_black_and_restart();
+        if (disp_write_byte((u8)(disp_pos_to_byte(dp_p_pos) | (fontface_pref << 2) | DISP_PENDING))) disp_black_and_restart();
         dp_ask = 0; dp_p_pos = disp_size_pos();
         dp_msg = SKO("The boot sector could not be written.", "부트 섹터에 쓸 수 없습니다.");
     }

@@ -552,7 +552,7 @@ static void fx_install_row(int ri) {
     if (r->bad) {                                               /* say WHY, in a sentence */
         if (r->note[0] == 'R') files_set_msg("That is where MiniWin runs from.");
         else if (r->note[0] == 'E') files_set_msg("Pick a logical partition inside it.");
-        else if (r->note[0] == 'T') files_set_msg("Too small: needs at least 1 MB.");
+        else if (r->note[0] == 'T') files_set_msg("Too small: needs at least 1344 KB.");
         else files_set_msg("Cannot install there.");
         return;
     }

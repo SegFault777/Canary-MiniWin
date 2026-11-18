@@ -10,7 +10,7 @@ VirtualBox by the developer. If something here does not match what you see, the 
 1. **Legacy BIOS, not UEFI.** MiniWin is loaded by BIOS INT 13h calls from a boot sector. A virtual machine set to UEFI
    (VirtualBox: "Enable EFI" ticked; VMware: Options > Advanced > Firmware type = UEFI, the default for some newer guest types
    such as Windows 11) will not find a bootable disk. Choose **BIOS / Legacy**.
-2. **Attach the image as a hard disk (recommended) or as a floppy.** As a hard disk use `os-image.img` (a raw 1 MB disk; convert it
+2. **Attach the image as a hard disk (recommended) or as a floppy.** As a hard disk use `os-image.img` (a raw 1344 KB disk; convert it
    as below). As a **floppy** (VMware: Floppy > "Use a floppy image file"; VirtualBox: a floppy controller with the image
    inserted) use `build/os-image-floppy.img`, the same image padded to 1.44 MB, and boot from the floppy: the loader reads it by
    CHS and the kernel runs from it through its floppy driver (alpha-7 and later -- before that this was the

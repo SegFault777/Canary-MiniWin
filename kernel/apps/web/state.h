@@ -107,10 +107,10 @@ static inline int web_header_y(void) { return web_win.y + TITLEBAR_H + MB_H + 3;
  * One set of functions for the geometry so drawing, hit-testing, scrolling and the page layout can never disagree. ---- */
 #define WEB_TB_N        9                    /* Back Forward Stop Refresh Home Search Font Mail Edit  (Favorites and Print are left out: there is neither) */
 #define WEB_TB_LINKS    9                    /* the "Links" button of the Address row shares the button numbering */
-#define WEB_TB_BW       50                   /* a toolbar button's width */
-#define WEB_TB_H        49                   /* ... and height: 3 + 32 (icon) + 1 + 11 (label) + 2 */
+#define WEB_TB_BW       (FONT_CELL * 4 + 6 > 46 ? FONT_CELL * 4 + 6 : 46)   /* a toolbar button's width: a label of the system font fits (50 with the 11-pixel face) */
+#define WEB_TB_H        (38 + FONT_CELL)     /* ... and height: 3 + 32 (icon) + 1 + the label + 2 (49 with the 11-pixel face) */
 #define WEB_URLBAR_H    18
-#define WEB_ADDR_LABEL_W 62                  /* room for the word "Address" before the field */
+#define WEB_ADDR_LABEL_W (FONT_CELL * 4 + 18)   /* room for the word "Address" before the field in the system font (62 with the 11-pixel face) */
 #define WEB_LINKS_W     46
 #define WEB_STATUS_H    17
 #define WEB_LOGO_W      52

@@ -24,6 +24,7 @@
 | [Source map](dev/SOURCE-MAP.md) | every source file in one line (generated) |
 | [Boot process](dev/BOOT-PROCESS.md) | BIOS to desktop, boot-disk detection, the **error code table** |
 | [Memory map](dev/MEMORY-MAP.md) | who owns which address |
+| [Fonts](dev/FONTS.md) | the font pack, faces, boot byte 440, the TrueType rasterizer |
 | [Disk layout](dev/DISK-LAYOUT.md) | what is in each sector of the image |
 | [Storage ids](dev/STORAGE-IDS.md) | the `ide1`/`sata2`/`nvme1`/... naming rules |
 | [Drivers](dev/DRIVERS.md) | every driver, what it supports and does not |

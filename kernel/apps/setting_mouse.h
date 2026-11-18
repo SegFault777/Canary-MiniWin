@@ -136,7 +136,7 @@ static void ms_draw_test(int x, int y, int w, int h) {
 /* One row of the Pointers list (called by lbx_draw inside the list's clip): the role's name on the left, its pointer picture (or a question mark) at the right edge. */
 static void ms_row_draw(int idx, int x, int y, int w, int h, int selected) {
     (void)h;
-    ko_draw_mixed_string(x + 7, y + (MS_ROW_H - 11) / 2, SKO(ms_roles[idx].en, ms_roles[idx].ko), selected ? TH_TEXT_INVERSE : TH_TEXT);
+    ko_draw_mixed_string(x + 7, y + (MS_ROW_H - FONT_CELL) / 2, SKO(ms_roles[idx].en, ms_roles[idx].ko), selected ? TH_TEXT_INVERSE : TH_TEXT);
     int c = ms_roles[idx].cur, px = x + w - 1 - 28;
     if (c >= 0) { const cursor_shape_t *s = &cursor_shapes[c]; draw_cursor_shape(px + (28 - s->w) / 2, y + (MS_ROW_H - s->h) / 2, s->rows, s->h); }
     else ic16_blit(px + 6, y + (MS_ROW_H - 16) / 2, IC_HELP);                          /* no pointer for this role in the icon pack yet */

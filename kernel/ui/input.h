@@ -25,7 +25,7 @@ static u32 last_install_click_tick = 0;
  * is asked at every drag step, not once. */
 static int win_min_w(int id) {
     int w = 0;
-    if (id == WIN_ID_SETTING)       w = mb_bar_min_w(setting_menus, SETTING_MENU_N);
+    if (id == WIN_ID_SETTING)       w = mb_bar_min_w(setting_menu_list(), SETTING_MENU_N);
     else if (id == WIN_ID_WEB)      w = mb_bar_min_w(web_menus, WEB_MENU_N);
     else if (id == WIN_ID_TERMINAL) w = mb_bar_min_w(term_menus, TERM_MENU_N);
     else if (id == WIN_ID_FILES)    w = mb_bar_min_w(files_menus, FILES_MENU_N);
@@ -312,7 +312,7 @@ static void handle_mouse(void) {
                     } else if (setting_close_hit(mx, my)) {
                         pressed_btn_kind = BTN_CLOSE;
                         pressed_btn_win = WIN_ID_SETTING;
-                    } else if (mb_click(WIN_ID_SETTING, setting.x, setting.y, setting.w, setting_menus, SETTING_MENU_N, mx, my, &mb_m, &mb_i)) {
+                    } else if (mb_click(WIN_ID_SETTING, setting.x, setting.y, setting.w, setting_menu_list(), SETTING_MENU_N, mx, my, &mb_m, &mb_i)) {
                         if (mb_i >= 0) setting_menu_action(mb_m, mb_i);
                     } else if ((setting_click_result = setting_click(mx, my, tick)) != 0) {
                         if (setting_click_result == 2) status = t(STR_IME_MIN_ONE);
@@ -571,6 +571,7 @@ static void handle_mouse(void) {
         if (mouse_release_event) dt_release(mx, my);      /* so do the Date/Time sheet's OK / Cancel / Apply and arrows */
         if (mouse_release_event) ms_release(mx, my);      /* ... and the Mouse sheet's */
         if (mouse_release_event) dp_release(mx, my);      /* ... and the Display sheet's */
+        if (mouse_release_event) fnt_release(mx, my);     /* ... and the Fonts folder's */
 
         if (mouse_release_event && pressed_btn_kind != BTN_NONE) {
             int kind = pressed_btn_kind, win = pressed_btn_win;

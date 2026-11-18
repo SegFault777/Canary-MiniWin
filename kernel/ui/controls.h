@@ -140,10 +140,15 @@ static void ui_group(int x, int y, int w, int h, const char *label) {
 static void ui_pushbutton(int x, int y, int w, int h, const char *label, int pressed, int enabled) {
     int p = enabled && pressed;
     ui_bevel(x, y, w, h, p);
-    ui_label(x + (w - ko_string_width(label)) / 2 + p, y + (h - 11) / 2 + p, label, enabled);
+    ui_label(x + (w - ko_string_width(label)) / 2 + p, y + (h - FONT_CELL) / 2 + p, label, enabled);
 }
 /* A sunken panel filled with the dialog colour (the preview box of a pointer, a test area). */
 static void ui_sunken(int x, int y, int w, int h) { bb_fillrect(x, y, w, h, TH_FACE); ui_bevel(x, y, w, h, 1); }
+/* A check box with its label to the right (the box is ui_checkbox() above). */
+static void ui_checkbox_label(int x, int y, const char *label, int checked, int enabled) {
+    ui_checkbox(x, y, checked);
+    ui_label(x + 19, y + (13 - FONT_CELL) / 2, label, enabled);
+}
 /* A radio button, 12 x 12 at (x, y): a sunken round field, a dot when on. Round: the distance from the centre in half pixels picks the ring. */
 static void ui_radio(int x, int y, int on) {
     for (int j = 0; j < 12; j++) for (int i = 0; i < 12; i++) {

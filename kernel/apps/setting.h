@@ -38,7 +38,7 @@ static const cp_item_t cp_items[SP_COUNT] = {
     { { "Regional Settings", "지역 설정" }, { "Changes the language of menus and messages.", "메뉴와 메시지의 언어를 바꿉니다." }, "EARTH" },
     { { "Sounds", "소리" }, { "Changes the sounds your computer makes.", "컴퓨터가 내는 소리를 바꿉니다." }, "SOUND" },
     { { "System", "시스템" }, { "Shows information about MiniWin and your computer.", "MiniWin과 컴퓨터의 정보를 보여 줍니다." }, "PC" },
-    { { "Font", "글꼴" }, { "Changes how letters are spaced (kerning).", "글자 사이 간격(커닝)을 바꿉니다." }, "FONT" },
+    { { "Font", "글꼴" }, { "Changes the system font and how letters are spaced.", "시스템 글꼴과 글자 간격을 바꿉니다." }, "FONT" },
 };
 #ifndef SKO
 #define SKO(en, ko) (sys_language == LANG_KOREAN ? (ko) : (en))   /* (also used by ui/startmenu.h, so it is defined in sys/lang.h now) */
@@ -276,7 +276,9 @@ static void setting_view(setting_view_t *v) {
 
 #include "setting_dt.h"   /* the Date/Time Properties sheet (needs the geometry above) */
 #include "setting_mouse.h" /* the Mouse Properties sheet: Buttons, Pointers, Motion, General (needs setting_dt.h's group and tab helpers) */
+static void setting_open_item(int i);
 #include "setting_display.h" /* the Display Properties sheet: Background, Settings (the screen area) -- and the "Keep this screen size?" question after a restart */
+#include "setting_font.h" /* the Fonts folder (Control Panel > Font): the faces as icons, a preview, "Use as System Font", kerning */
 
 /* ================================================================ the menu bar */
 #define SETTING_MENU_N 3
@@ -285,8 +287,16 @@ static const mb_menu_t setting_menus[SETTING_MENU_N] = {
     { { "View", "보기" }, 1, { { "Control Panel", "제어판" } } },
     { { "Help", "도움말" }, 1, { { "About MiniWin", "MiniWin 정보" } } },
 };
-static void setting_open_item(int i) { if (i < 0 || i >= SP_COUNT) return; setting_page = i; setting_scroll = 0; setting_hscroll = 0; setting_armed = -1; if (i == SP_DATETIME) dt_open(); if (i == SP_MOUSE) ms_open(); if (i == SP_DISPLAY) dp_open(); }
+/* The Fonts folder has its own File and View menus (Open, Use as System Font ...). */
+static const mb_menu_t setting_font_menus[SETTING_MENU_N] = {
+    { { "File", "파일" }, 3, { { "Open", "열기" }, { "Use as System Font", "시스템 글꼴로 사용" }, { "Close", "닫기" } } },
+    { { "View", "보기" }, 2, { { "Kerning", "커닝" }, { "Control Panel", "제어판" } } },
+    { { "Help", "도움말" }, 1, { { "About MiniWin", "MiniWin 정보" } } },
+};
+static const mb_menu_t *setting_menu_list(void) { return setting_page == SP_TEXT ? setting_font_menus : setting_menus; }
+static void setting_open_item(int i) { if (i < 0 || i >= SP_COUNT) return; setting_page = i; setting_scroll = 0; setting_hscroll = 0; setting_armed = -1; if (i == SP_DATETIME) dt_open(); if (i == SP_MOUSE) ms_open(); if (i == SP_DISPLAY) dp_open(); if (i == SP_TEXT) fnt_open(); }
 static void setting_menu_action(int menu, int item) {
+    if (setting_page == SP_TEXT) { fnt_menu_action(menu, item); return; }
     if (menu == 0) { if (item == 0) { if (setting_page < 0) setting_open_item(setting_sel); } else setting.open = 0; }
     else if (menu == 1) { setting_page = -1; setting_armed = -1; }
     else { setting_sel = SP_SYSTEM; setting_open_item(SP_SYSTEM); }
@@ -326,7 +336,7 @@ static void draw_setting_window(void) {
                         pressed_btn_kind == BTN_MIN && pressed_btn_win == WIN_ID_SETTING,
                         pressed_btn_kind == BTN_MAX && pressed_btn_win == WIN_ID_SETTING,
                         pressed_btn_kind == BTN_CLOSE && pressed_btn_win == WIN_ID_SETTING);
-    mb_draw_bar(WIN_ID_SETTING, wx, wy, ww, setting_menus, SETTING_MENU_N);
+    mb_draw_bar(WIN_ID_SETTING, wx, wy, ww, setting_menu_list(), SETTING_MENU_N);
 
     const char *status = "";
     if (setting_page < 0) {
@@ -344,9 +354,9 @@ static void draw_setting_window(void) {
         bb_clip_off();
         if (g.vbar) sb_draw(WIN_ID_SETTING);
         status = mb_str(&cp_items[setting_sel].desc);
-    } else if (setting_page == SP_DATETIME || setting_page == SP_MOUSE || setting_page == SP_DISPLAY) {
+    } else if (setting_page == SP_DATETIME || setting_page == SP_MOUSE || setting_page == SP_DISPLAY || setting_page == SP_TEXT) {
         bb_clip_set(wx + 3, setting_body_y(), ww - 6, setting_status_y() - setting_body_y());
-        if (setting_page == SP_DATETIME) dt_draw(); else if (setting_page == SP_MOUSE) ms_draw(); else dp_draw();   /* ---- a property sheet: tabs, groups, OK / Cancel / Apply ---- */
+        if (setting_page == SP_DATETIME) dt_draw(); else if (setting_page == SP_MOUSE) ms_draw(); else if (setting_page == SP_TEXT) fnt_draw(); else dp_draw();   /* ---- a property sheet: tabs, groups, OK / Cancel / Apply ---- */
         bb_clip_off();
         status = mb_str(&cp_items[setting_page].desc);
     } else {
@@ -380,7 +390,7 @@ static void draw_setting_window(void) {
     ui_readout(wx + 3, setting_status_y(), ww - 6, CP_STATUS_H, 0);
     { char clipped[96]; setting_slice(status, 0, ww - 6 - 8, clipped, sizeof clipped);          /* never wider than the bar */
       ko_draw_mixed_string(wx + 7, setting_status_y() + 2, clipped, TH_TEXT); }
-    mb_draw_drop(WIN_ID_SETTING, wx, wy, setting_menus, SETTING_MENU_N);
+    mb_draw_drop(WIN_ID_SETTING, wx, wy, setting_menu_list(), SETTING_MENU_N);
 }
 
 /* ================================================================ input */
@@ -399,6 +409,7 @@ static int setting_click(int mx, int my, u32 now) {
     if (setting_page == SP_DATETIME) return dt_click(mx, my);
     if (setting_page == SP_MOUSE) return ms_click(mx, my, now);
     if (setting_page == SP_DISPLAY) return dp_click(mx, my);
+    if (setting_page == SP_TEXT) return fnt_click(mx, my, now);
     if (in_rect(mx, my, cp_back_x(), cp_back_y(), CP_BACK_W, CP_BACK_H)) { setting_page = -1; setting_armed = -1; return 1; }
     setting_view_t v; setting_view(&v);
     if (!in_rect(mx, my, v.x, v.y, v.w, v.rows * SETTING_ROW_GAP)) return 0;
@@ -440,7 +451,8 @@ static int setting_click(int mx, int my, u32 now) {
 /* the keyboard (the window has the focus): arrows move the selection, Enter opens it; Esc / Backspace / Left in a page go back */
 static void setting_key(int k) {
     if (setting_page == SP_MOUSE && ms_key(k)) return;                  /* (Up / Down on the Pointers tab) */
-    if (setting_page == SP_DISPLAY && dp_key(k)) return;                /* (the colour list, the slider, the question) */
+    if (setting_page == SP_DISPLAY && dp_key(k)) return;
+    if (setting_page == SP_TEXT && fnt_key(k)) return;                /* (the colour list, the slider, the question) */
     if (setting_page >= 0) { if (k == 27 || k == '\b' || k == KEY_LEFT) { setting_page = -1; setting_armed = -1; } return; }
     cp_grid_t g; cp_grid(&g);
     if (k == KEY_LEFT && setting_sel > 0) setting_sel--;

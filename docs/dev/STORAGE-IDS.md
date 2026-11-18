@@ -90,7 +90,7 @@ DISKS tab with its size and no partitions.
 | `ST_E_NO_PARTITION` | no such partition on that disk |
 | `ST_E_EXTENDED` | the partition is an MBR extended container |
 | `ST_E_RANGE` | the partition table points outside the device |
-| `ST_E_TOO_SMALL` | fewer than 2048 sectors |
+| `ST_E_TOO_SMALL` | fewer than 2688 sectors |
 | `ST_E_OVERLAP_BOOT` | any part of the target overlaps the installation that is running |
 
 The checks run in this order; the first failure wins. Success fills a `st_target_t`: the ATA position, the absolute base

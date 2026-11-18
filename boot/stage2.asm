@@ -236,7 +236,7 @@ stage2_entry:
     xor ax, ax
     mov es, ax
     mov al, [es:0x7C00 + 440]
-    and al, 0x7F                   ; bit 7 = "the kernel has not asked Keep this size? yet": the size is in the low bits
+    and al, 0x03                   ; bits 0-1 = the size; bit 7 = "the kernel has not asked Keep this size? yet"; bits 2-4 = the system font face (the kernel's)
     cmp al, 1
     jne .not_320
     mov word [want_w], 320
