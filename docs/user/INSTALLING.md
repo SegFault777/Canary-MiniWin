@@ -111,6 +111,29 @@ Sectors outside the target (the rest of the disk, other partitions) are never to
    runs MiniShell refuses other commands. Powering off mid-install is safe in the sense of rule 4: the target is
    simply not bootable.
 
+## The first start of an installed system: the setup
+
+A system `os-inst` has just made has no settings yet, so its **first boot runs the setup**: a full-screen wizard in the manner of the Windows 98
+first-run screens, with a bar of four phases on top (*Getting Started*, *License Agreement*, *Your Account*, *Final Settings*) and a blue panel on the left.
+It asks, one page at a time (Back and Next, or the Enter key):
+
+1. **Language**: English or Korean (the next pages are in it at once).
+2. **Input methods**: English only, Korean only, or both (Right Alt switches), and which one starts.
+3. **License agreement**: the whole GNU General Public License, version 3, in a scrolling box -- in English, or the Korean translation (`LICENSE.ko.txt`, an
+   unofficial translation) when the language is Korean. Scroll with the wheel, the scroll bar or the Down arrow and Space keys (Home and End jump). The setup does
+   not go on unless **I accept the agreement** is chosen.
+4. **User name**.
+5. **Password**: type it twice; leave both boxes empty for none. With a password, every start asks for it before the desktop shows (a *Welcome* screen).
+6. **Desktop colour**, with a small screen that shows it.
+7. **Screen size**: 320 x 200, 640 x 480 or 854 x 480. MiniWin cannot read the monitor, so the size it started with is preselected; another one restarts the
+   screen when you finish (and asks *Keep this screen size?* as Settings > Display does).
+8. **Time zone** and daylight saving.
+9. **Date and time**: checked against the clock; change them if wrong (typed as local time, written to the clock as UTC).
+
+Everything is kept in `/etc/SYSTEM.CFG` (and the password, as a salted hash, in `/etc/USER.PWD`); changing the language, an input method, the desktop colour
+or the time zone later in Settings keeps the new value too. The setup runs only once. **A live disc or a floppy has no setup**: they can keep nothing, the user
+is simply called `LIVE`, and everything starts from the defaults every time. `whoami` in MiniShell says who you are.
+
 ## Booting the result
 
 * **Whole disk (`<type><n>00`).** The disk now has MiniWin's own boot sector as its MBR: boot that disk.

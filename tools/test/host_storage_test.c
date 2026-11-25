@@ -112,6 +112,10 @@ static u8 fake_bootsect[512];
 #define MW_BOOTSECT_COPY ((const u8 *)fake_bootsect)
 #define MW_BOOT_INFO8(addr) ((u8)0x80)          /* "booted from the first hard disk": the floppy driver stays out of it */
 
+/* what os_inst.h borrows from the kernel (the installer copies the licence texts into the new root volume) */
+static void *kmalloc(u32 n) { return malloc(n); }
+static int kfree(void *p) { free(p); return 0; }
+static void append_str(char *b, u32 *n, u32 cap, const char *s) { while (*s && *n + 1 < cap) b[(*n)++] = *s++; b[*n] = 0; }
 #include "../../kernel/storage.h"
 #include "../../kernel/os_inst.h"
 

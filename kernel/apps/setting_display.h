@@ -50,10 +50,15 @@ static int disp_confirm_left(void) {
 }
 static void disp_keep(void) { int v; if (disp_read_byte(&v)) disp_write_byte(disp_unavail ? (u8)(fontface_pref << 2) : (u8)(v & ~DISP_PENDING)); disp_confirm_open = 0; disp_unavail = 0; }   /* (an unavailable size is forgotten: the byte goes back to 640x480) */
 static void disp_revert(void) { disp_confirm_open = 0; disp_write_byte((u8)(fontface_pref << 2)); disp_black_and_restart(); }     /* back to 640x480 */
-/* ---- the system font face is kept in the same byte (bits 2-4: pack index + 1, 0 = the default) ---- */
+/* ---- the system font face is kept in the same byte (bits 2-4: pack index + 1, 0 = the default, 7 = the TrueType font of /etc/FONT.CFG) ---- */
 /* At boot: the face the byte names; with none chosen, a 320 x 200 screen starts on the 7-pixel face (more fits), anything else on the built-in 11. */
 static void fontface_boot_apply(int pref) {
     fontface_init_order();
+    if (pref == UFT_PREF) {                                                             /* a TrueType font (/etc/FONT.CFG): built again now, with a progress bar */
+        int k = uft_load_cfg();
+        if (k >= 0) { fontface_init_order(); if (fontface_use(fp_n + k)) { fontface_pref = UFT_PREF; return; } }
+        pref = 0;                                                                       /* gone or broken: the default face */
+    }
     if (fp_n < 2) return;                                                               /* the floppy's pack has one face: nothing to switch */
     int idx = -1;
     if (pref >= 1 && pref - 1 < fp_n) { idx = pref - 1; fontface_pref = pref; }
@@ -279,7 +284,7 @@ static int dp_btn_hit(int mx, int my) {
 }
 /* Writes what was chosen. The colour is applied at once; a new screen area asks first (it restarts the computer). */
 static void dp_apply(void) {
-    setting_desk_idx = dp_lb.sel; setting_desk_apply();
+    setting_desk_idx = dp_lb.sel; setting_desk_apply(); syscfg_touch();
     if (dp_p_pos != disp_size_pos()) {
         if (live_boot) { dp_msg = SKO("The live disc cannot change the screen size.", "라이브 디스크에서는 화면 크기를 바꿀 수 없습니다."); dp_p_pos = disp_size_pos(); }
         else dp_ask = 1;

@@ -53,5 +53,25 @@ through the cmap (formats 4 and 12), `ttf_render()` makes one glyph's rows, `ttf
 - **Test.** `tools/test/run_host_ttf.sh` rasterizes the five Galmuri TTFs and requires all 56,590 glyphs to equal the pack's bitmap
   faces pixel for pixel, renders other fonts, and fuzzes hostile input under ASan/UBSan.
 
-The Fonts folder in Control Panel does not use the rasterizer yet: installing a `.ttf` (copy to the Fonts folder, rasterize into a
-face, list it, apply it) is the next step.
+## Installed TrueType fonts (`kernel/fonttf.h`, `kernel/apps/setting_addfont.h`)
+
+*Install New Font* in the Fonts folder opens the **Add Fonts** dialog (a modal panel over the page, in the manner of Windows 95: list of font
+files, folder list, drive drop-down, "Copy fonts to Fonts folder", OK / Cancel / Select All / Help / a grey Network...). OK checks each file
+with `ttf_open()`, copies it to `/lib/fonts` (the dialog raises `vfs_priv` for that one write: `/lib` is a system directory) or, with the copy
+off, lists it by its path, and `uft_add()` puts it in the list `uft_ent[]` (at most `UFT_MAX` = 8). The list is rebuilt from `/lib/fonts`
+(`uft_scan()`) every time the Fonts folder opens, so copied fonts survive a restart.
+
+**Face indices.** `0 .. fp_n-1` are the pack's faces, `fp_n .. fp_n+uft_n-1` the installed fonts (`fontface_is_ttf()`); `fontface_load()` of such
+an index calls `uft_build()`: read the file (`uft_read`, up to 16 MB), `ttf_make_face()` at the font's cell, with the Galmuri face of the same
+cell as the fallback (`uft_fallback()`; the built-in tables are joined into one block for cell 11). Only the sizes with a regular pack face
+(7, 9, 11, 14) are offered (`uft_desc_of()`), and `ppem = cell + 1`. Nothing is cached: opening a preview or using the font rasterizes the
+whole face again (`fontface_in_use()` also says when a font is on screen at a size other than the listed one).
+
+**Keeping one across a restart.** Bits 2-4 of byte 440 hold a pack index + 1; the value `UFT_PREF` (7) means "the TrueType font of
+`/etc/FONT.CFG`" (the font's path, a new line, its size). *Use as System Font* on a font that lives in `/lib/fonts` writes the file
+(`uft_save_cfg`, with `vfs_priv` raised: `/etc` is a system directory) and the byte; on any other font (or a disc that cannot be written) it only
+holds until the restart and says so. At boot `fontface_boot_apply()` calls `uft_load_cfg()` (lists `/lib/fonts`, reads the file) and
+`fontface_use()`, which rasterizes the face again with a progress bar (`ttf_progress` -> `uft_progress_draw`: "Loading font..." and a bar, drawn
+straight to the screen every 256 glyphs); if that fails the default face stays. This limits the pack to six faces (index + 1 must stay below 7).
+
+**Not done yet:** removing an installed font, reading the real font name from the `name` table (the file name is used), network folders.

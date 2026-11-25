@@ -35,10 +35,13 @@ assert all(sec(src,l)==sec(t,l) for l in system), "system sectors differ"
 assert sec(t,2373)[:4]==b'MWF2', "no MWFS root volume after the system sectors"
 root_sectors=struct.unpack('<I',sec(t,2373)[8:12])[0]; data_lba=struct.unpack('<I',sec(t,2373)[32:36])[0]
 assert root_sectors==32768-2373, "the root volume fills the rest of the disk (got %d)" % root_sectors
-assert not any(t[(2373+data_lba+2)*512:]), "the volume's data area was written (only the root directory sector may be)"
+assert not any(t[(2373+data_lba+2+400)*512:]), "the volume's data area was written beyond the licence texts (only /etc and its two files may be there)"
 b=sec(t,0); assert struct.unpack('<II',b[432:440])[0]==0 and struct.unpack('<I',b[436:440])[0]!=0, "fields"
 assert [i for i in range(512) if sec(src,0)[i]!=b[i]]==[436,437,438,439] or struct.unpack('<I',b[436:440])[0]!=0
 PY
+wsec=$(( $(stat -c%s $B/whole.img) / 512 - 2373 ))
+l=$(python3 tools/mwfs.py ls $B/whole.img --lba 2373 --sectors $wsec --path /etc 2>&1 | tr '\n' ' ')
+echo "$l" | grep -q "LICENSE.TXT" && echo "$l" | grep -q "LICENSE_KO.TXT" && ! echo "$l" | grep -q "SYSTEM.CFG" && ok "whole disk: /etc has both licence texts and no SYSTEM.CFG (the setup will run)" || bad "whole disk /etc: $l"
 run whole_boot "-drive file=$B/whole.img,format=raw,if=ide,index=0" "wait 20" "shot $B/whole_boot.ppm"
 grep -aq "installation base LBA 0 on ide1" $B/serial_whole_boot.log && ok "whole disk boots alone (primary master)" || bad "whole disk boot"
 
@@ -63,7 +66,7 @@ assert all(sec(src,l)==sec(t,base+l) for l in range(1,2373))
 assert sec(t,base+2373)[:4]==b'MWF2', "no MWFS root volume in the partition"
 assert struct.unpack('<I',sec(t,base+2373)[8:12])[0]==8192-2373, "root volume fills the partition"
 data_lba=struct.unpack('<I',sec(t,base+2373)[32:36])[0]
-assert not any(t[(base+2373+data_lba+2)*512:(base+8192)*512]), "partition data area written"
+assert not any(t[(base+2373+data_lba+2+400)*512:(base+8192)*512]), "partition data area written beyond the licence texts"
 assert not any(t[(base+8192)*512:]), "past the partition touched"
 assert t[:446]==chain and t[510:512]==b'\x55\xaa'
 assert [t[446+i*16] for i in range(4)]==[0,0x80,0,0]
@@ -75,11 +78,12 @@ for ch in 0 2; do
     want=$([ $ch = 0 ] && echo ide1 || echo ide3)
     grep -aq "installation base LBA 10240 on $want" $B/serial_part_boot$ch.log && ok "partition install boots alone via the chain loader ($want)" || bad "partition boot on $want"
 done
-python3 - $B <<'PY' && ok "the booted installs show the desktop" || bad "booted screens"
+# a fresh install has no /etc/SYSTEM.CFG: its first boot runs the first-run setup (apps/oobe.h), a white page in the middle of the screen
+python3 - $B <<'PY' && ok "the booted installs run the first-run setup" || bad "booted screens"
 import sys
 from PIL import Image
 for n in ("whole_boot","part_boot0","part_boot2"):
     im=Image.open(sys.argv[1]+"/%s.ppm"%n).convert("RGB")
-    assert im.getpixel((300,200))==(85,255,255), n          # the desktop colour in the middle of the screen
+    assert im.getpixel((300,300))==(255,255,255) and im.getpixel((100,30))!=(255,255,255), n          # the white page of the setup, the header above it
 PY
 exit $fail

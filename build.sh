@@ -257,6 +257,13 @@ EOF
 # The stock image's root filesystem: a fresh MWFS over the tail of the image (tools/mwfs.py is the offline twin of
 # kernel/mwfs.h). Programs are installed into it afterwards by tools/install_mwp.py.
 python3 tools/mwfs.py format "$BUILD/os-image.img" --lba "$MW_ROOTFS_LBA" --sectors "$MW_ROOTFS_STOCK_SECTORS" --label MINIWIN
+# The licence the first-run setup shows (apps/oobe.h): GPL 3.0 in English and the Korean translation. The installer copies both from here into the
+# new root volume it formats. And /etc/SYSTEM.CFG: THIS image counts as set up (no first-run setup when it is booted as it is, e.g. in a VM or by the
+# test scripts); a system the installer makes starts without it and runs the setup on its first boot.
+python3 tools/mwfs.py put "$BUILD/os-image.img" LICENSE --lba "$MW_ROOTFS_LBA" --sectors "$MW_ROOTFS_STOCK_SECTORS" --path /etc/LICENSE.TXT
+python3 tools/mwfs.py put "$BUILD/os-image.img" LICENSE.ko.txt --lba "$MW_ROOTFS_LBA" --sectors "$MW_ROOTFS_STOCK_SECTORS" --path /etc/LICENSE_KO.TXT
+printf 'oobe=1\nuser=User\n' > "$BUILD/SYSTEM.CFG"
+python3 tools/mwfs.py put "$BUILD/os-image.img" "$BUILD/SYSTEM.CFG" --lba "$MW_ROOTFS_LBA" --sectors "$MW_ROOTFS_STOCK_SECTORS" --path /etc/SYSTEM.CFG
 
 # The font pack: the MINIMAL one (Galmuri11 only) -- without it the Hangul table is missing, the kernel no longer carries it.
 # tools/install_all.sh puts the full pack into the image it hands out (the floppy copy keeps this one).

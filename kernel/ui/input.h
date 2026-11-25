@@ -65,6 +65,7 @@ static void handle_mouse(void) {
 
         int left_now = mouse_left;
         int clicked = mouse_click_event; /* per-packet edge detection from the driver */
+        if (oobe_open) { oobe_mouse(mx, my, clicked); return; }                      /* the first-run setup / the logon prompt owns the mouse ... */
         if (disp_confirm_open) { disp_confirm_mouse(mx, my, clicked); return; }      /* "Keep this screen size?" owns the mouse until it is answered */
 
         /* ---- a scroll bar thumb being dragged (ui/scrollbar.h) ---- */
@@ -732,6 +733,7 @@ static void handle_keyboard(void) {
      * also why raising a window on click matters beyond visuals:
      * the topmost window IS the keyboard focus. ---- */
     int k = keyboard_poll_key();
+    if (oobe_open) { oobe_key(k); k = KEY_NONE; }                                                  /* ... and the keyboard */
     if (disp_confirm_open) { if (k == '\n') disp_keep(); else if (k == 27) disp_revert(); k = 0; }       /* ... and so does the keyboard */
     int focused_id = -1;
     for (int zi = z_count - 1; zi >= 0; zi--) {

@@ -279,6 +279,7 @@ static void setting_view(setting_view_t *v) {
 static void setting_open_item(int i);
 #include "setting_display.h" /* the Display Properties sheet: Background, Settings (the screen area) -- and the "Keep this screen size?" question after a restart */
 #include "setting_font.h" /* the Fonts folder (Control Panel > Font): the faces as icons, a preview, "Use as System Font", kerning */
+#include "setting_addfont.h" /* the Add Fonts dialog of the Fonts folder: install TrueType fonts from any folder or drive */
 
 /* ================================================================ the menu bar */
 #define SETTING_MENU_N 3
@@ -289,7 +290,7 @@ static const mb_menu_t setting_menus[SETTING_MENU_N] = {
 };
 /* The Fonts folder has its own File and View menus (Open, Use as System Font ...). */
 static const mb_menu_t setting_font_menus[SETTING_MENU_N] = {
-    { { "File", "파일" }, 3, { { "Open", "열기" }, { "Use as System Font", "시스템 글꼴로 사용" }, { "Close", "닫기" } } },
+    { { "File", "파일" }, 4, { { "Open", "열기" }, { "Use as System Font", "시스템 글꼴로 사용" }, { "Install New Font...", "새 글꼴 설치..." }, { "Close", "닫기" } } },
     { { "View", "보기" }, 2, { { "Kerning", "커닝" }, { "Control Panel", "제어판" } } },
     { { "Help", "도움말" }, 1, { { "About MiniWin", "MiniWin 정보" } } },
 };
@@ -421,6 +422,7 @@ static int setting_click(int mx, int my, u32 now) {
     switch (setting_page) {
     case SP_REGIONAL:
         sys_language = idx == 0 ? LANG_ENGLISH : LANG_KOREAN;
+        syscfg_touch();
         return 3;
     case SP_KEYBOARD: {
         int me = idx == 0 ? IME_ENGLISH : IME_KOREAN, other = idx == 0 ? IME_KOREAN : IME_ENGLISH;
@@ -428,10 +430,11 @@ static int setting_click(int mx, int my, u32 now) {
         if (ime_enabled[me] && !ime_enabled[other]) return 2;
         ime_enabled[me] = !ime_enabled[me];
         ime_ensure_current_enabled();
+        syscfg_touch();
         return 1;
     }
     case SP_DISPLAY:
-        if (idx == 0) { setting_desk_idx = (setting_desk_idx + 1) % SETTING_DESK_N; setting_desk_apply(); }
+        if (idx == 0) { setting_desk_idx = (setting_desk_idx + 1) % SETTING_DESK_N; setting_desk_apply(); syscfg_touch(); }
         return 1;
     case SP_SOUND:
         sound_enabled = !sound_enabled;
@@ -454,6 +457,7 @@ static void setting_key(int k) {
     if (setting_page == SP_DISPLAY && dp_key(k)) return;
     if (setting_page == SP_TEXT && fnt_key(k)) return;                /* (the colour list, the slider, the question) */
     if (setting_page >= 0) { if (k == 27 || k == '\b' || k == KEY_LEFT) { setting_page = -1; setting_armed = -1; } return; }
+    if (k == KEY_NONE) return;                                          /* (this is called every frame: only a key may bring the selection back into view, or it would undo what the scroll bar and the wheel just did) */
     cp_grid_t g; cp_grid(&g);
     if (k == KEY_LEFT && setting_sel > 0) setting_sel--;
     else if (k == KEY_RIGHT && setting_sel < SP_COUNT - 1) setting_sel++;

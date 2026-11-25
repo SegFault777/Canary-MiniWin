@@ -243,7 +243,7 @@ class Vol:
 
     def put(self, path, data, aux=0):
         parent, _, name = path.rstrip("/").rpartition("/")
-        dino = self.walk(parent)
+        dino = self.mkpath(parent)                              # the folders above the file are made when they are missing
         if self.lookup(dino, name):
             raise SystemExit(f"mwfs.py: {path} already exists")
         n = self.alloc_ino(T_FILE)

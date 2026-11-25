@@ -81,3 +81,17 @@ the *n*-th entry of a cache of `/home/docs` (up to `FS_MAX_FILES` = 64) or `/pro
 points at "document 3" keeps working while the bytes live in ordinary files. A document is still at most
 `FS_MAX_FILE_BYTES` = 4096 bytes because that is what Notepad's buffer holds; a program is at most `PROG_MAX_BYTES` = 24576.
 `fs_rescan_docs()` / `fs_rescan_progs()` re-read the directories (boot does, and so do the shell commands that change them).
+
+## What lives in /etc
+
+| file | what | written by |
+|---|---|---|
+| `SYSTEM.CFG` | `oobe=1`, `user=`, `lang=`, `ime_en= ime_ko= ime_cur=`, `desk=`, `tz=`, `dst=`: text, one `key=value` per line, every key optional (`kernel/syscfg.h`) | the first-run setup; Settings (`syscfg_touch()`) |
+| `USER.PWD` | the user's logon password: 16 bytes of salt and a stretched SHA-256, both in hex (96 bytes); no file = no password | the first-run setup |
+| `ROOT.PWD` | the same format, for MiniShell's `root` | MiniShell |
+| `FONT.CFG` | the TrueType font kept as the system font (path, size) | Settings > Font |
+| `LICENSE.TXT`, `LICENSE_KO.TXT` | the GPL 3.0, English and the Korean translation, shown by the first-run setup | `build.sh` into the stock image; the installer copies them into the new root volume |
+
+The stock image (and so the live disc and the floppy) carries a `SYSTEM.CFG` (`oobe=1`, `user=User`) so that booting it as it is -- in a VM, in the test
+scripts -- starts at the desktop; a live boot ignores the file anyway (`sys_is_live()`). `os-inst` formats a fresh root volume without it, which is what makes the
+first boot of the installed system run the setup (`apps/oobe.h`, [OOBE.md](OOBE.md)).

@@ -71,6 +71,22 @@ down; click twice), **Regional Settings** (menus and messages in English or Kore
 **System** (version, CPU, memory, screen) and **Font** (kerning: tighter letter pairs such as AV and To in menus and labels; the shell
 and Notepad stay fixed-width). When the window is too small, the grid re-flows and gets a scroll bar.
 
+### Fonts (Control Panel > Font)
+
+The Fonts folder shows the fonts as icons: the Galmuri faces that come with MiniWin and the TrueType fonts you have installed. A double
+click opens a *preview* of the font (its name, its size in pixels, sample lines drawn in the font itself); **Use as System Font** makes it the
+font of the whole desktop at once. A Galmuri face is kept across restarts (the boot sector holds the choice; the live disc cannot keep it); so is a
+TrueType font that was copied into `/lib/fonts` (see below): at the next start MiniWin builds its face again, which takes a moment and shows
+a *Loading font...* bar. A TrueType font used from another disk lasts until the computer is restarted.
+
+**Install New Font...** (a button, and in the File menu) opens **Add Fonts**: pick a drive (the system disk or a disk mounted under `/mnt`) and
+a folder, click the font files (`.ttf`, `.ttc`, `.otf` with TrueType outlines) to select them -- a second click deselects, **Select All** takes
+them all -- and press **OK**. With *Copy fonts to Fonts folder* on, each font is copied into `/lib/fonts` and is there after a restart (it needs
+room on the system disk: the live disc has almost none); with it off the font is used from where it is, for this session only (it cannot be kept as the system font). A font made
+with PostScript outlines (an `.otf` that is not TrueType) is refused. A TrueType font can be drawn at 7, 9, 11 or 14 pixels (the **Size**
+button in its preview); the Hangul it lacks is taken from the Galmuri face of the same size. Rendering is not hinted, so ordinary
+outline fonts look soft at these sizes; pixel fonts look exact. Up to eight installed fonts are listed. Building a face takes a moment.
+
 ## Scroll bars and menus
 
 Every window that scrolls (Notepad, MiniWeb, MiniShell, MiniFiles' list) has the same scroll bar: click an arrow to move a line,
@@ -92,6 +108,27 @@ It is a demonstration of the network stack, not a replacement for a real browser
 
 A text console: directories and files (`ls cd mkdir cp mv rm ...`), partitions (`part`), system information, installing and power; its
 prompt shows the current directory. See [TERMINAL.md](TERMINAL.md).
+
+## Right-click menus
+
+The right mouse button (the *secondary* button: with *Left-handed* on in Setting > Mouse it is the left one) opens a menu for what is under the pointer; the help line of the item under the pointer shows in the status bar. A grey item does not apply now (or is not built yet). A click elsewhere closes the menu.
+
+| where | items |
+|---|---|
+| the bare desktop | Arrange Icons, Line up Icons, Paste, Paste Shortcut, Undo Delete (grey: not built yet), **New >** (Folder is grey; Shortcut adds one to the Start menu; Text Document opens a new Notepad), **Properties** (opens Display) |
+| a desktop icon | **Open**; Add to Zip, Send To, Cut, Copy, Create Shortcut, Delete, Rename, Properties are grey (not built yet) |
+| MiniFiles, on a file or folder | **Open, Cut, Copy, Delete, Rename** (they follow the same rules as the buttons: not in read-only or system folders); Send To, Create Shortcut, Properties are grey |
+| MiniFiles, on the bare list | **View >** (Folders, Disks, by Name, by Size, by Type, by Date), **Refresh, Paste, New > Folder**; Properties is grey |
+| Notepad's text | Undo, Cut, Copy, Paste, Delete, Select All |
+| any one-line field (MiniWeb's address, MiniShell's command line, Save As, the rename box) | Cut, Copy, Paste, Delete, Select All (a password field cannot be cut or copied) |
+| MiniWeb, on a link | Open Link, Copy Link Address, Back, Forward, Refresh |
+| MiniWeb, on the page | Back, Forward, Refresh, Home |
+| **MiniShell, on the black output area** | **Copy All** (the whole window, the newest 4096 bytes if there is more), **Paste** (into the command line: the first line of the Clipboard), **Clear** |
+| **Control Panel, on an icon** | **Open** |
+| **Fonts folder, on a font** | **Open**, **Use as System Font**, **Install New Font...** |
+| **Fonts folder, on the empty part** | **Install New Font...** |
+
+A program written for MiniWin can open a menu of its own (`menu_popup`, ABI version 4).
 
 ## MiniFiles
 

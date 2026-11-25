@@ -47,6 +47,7 @@ For how the pieces fit together see [ARCHITECTURE.md](ARCHITECTURE.md); for the 
 | `kernel/font_latin_data.h` | *generated* -- Auto-generated 11x11 bitmap glyphs for printable ASCII (U+0020 space through U+007E tilde), extracted from Galmuri11 (see third_party/galmuri-font/, SIL Open Font License 1.1) by... |
 | `kernel/fontface.h` | Changing the system font FACE at run time (1.1-alpha-14). |
 | `kernel/fontpack.h` | The FONT PACK reader (1.1-alpha-14). |
+| `kernel/fonttf.h` | The TrueType fonts the user has installed (1.1-alpha-14): a short list, and the building of a face out of one. |
 | `kernel/fs.h` | Where things live on the disk, and the document/program "slot" API the desktop, Notepad, MiniFiles and the shell were written against, now a thin layer over a real filesystem (mwfs.h,... |
 | `kernel/gcm.h` | AES-GCM, per NIST SP 800-38D. The AEAD (Authenticated Encryption with Associated Data) cipher this client actually needs: discovered during development that the servers/gateways worth... |
 | `kernel/h3.h` | HTTP/3 (RFC 9114) with QPACK (RFC 9204) on top of quic.h: one GET or POST per connection, the answer handed to httpresp.h as an ordinary HTTP/1.1-shaped response (status line, headers,... |
@@ -98,6 +99,7 @@ For how the pieces fit together see [ARCHITECTURE.md](ARCHITECTURE.md); for the 
 | `kernel/sha512.h` | Same redundant-but-legal typedef as sha256.h and friends |
 | `kernel/speaker.h` | PC speaker -- the tiny piezo buzzer that's been bolted to x86 motherboards since 1981, driven straight through the PIT (Programmable Interval Timer, the same chip that would drive a... |
 | `kernel/storage.h` | Which storage devices exist, how they are partitioned, and the "storage id" that names one of their partitions (the argument of the terminal's `os-inst`). |
+| `kernel/syscfg.h` | The settings that outlive a restart, and who the user is (1.1-alpha-14). |
 | `kernel/sysinfo.h` | What the machine is, for the Terminal's `fetch`: the CPU's name and speed, how busy the kernel is, the graphics adapter and its video memory, the RAM. Everything here is read from the... |
 | `kernel/tcp.h` | TCP, or: the protocol that promises the things UDP refuses to. |
 | `kernel/tls.h` | Defines MW_TEST_ROOT_COUNT, mw_test_roots[], mw_test_root_lens[] |
@@ -120,8 +122,10 @@ For how the pieces fit together see [ARCHITECTURE.md](ARCHITECTURE.md); for the 
 | `kernel/apps/notepad/menus.h` | Notepad's menu bar (File, Edit, Help), described as data for ui/menubar.h, and what each item does. |
 | `kernel/apps/notepad/save.h` | Save / save-as / new logic shared by the menu, Ctrl+S and the confirm dialog. |
 | `kernel/apps/notepad/windows.h` | The NOTEPAD_MAX Notepad windows: state, creation, focus, per-window text buffers. |
+| `kernel/apps/oobe.h` | The first-run setup ("out of the box experience") and the logon prompt (1.1-alpha-14). |
 | `kernel/apps/progwin.h` | A .MWP running IN A WINDOW (1.1-alpha-11). |
 | `kernel/apps/setting.h` | SETTING.MWP, laid out like the Windows 95 Control Panel (1.1-alpha-13): a grid of big icons with their names under them, one per kind of setting; double-click one (or select it and press... |
+| `kernel/apps/setting_addfont.h` | "Add Fonts", the dialog of Control Panel > Font > Install New Font (1.1-alpha-14), in the manner of Windows 95. |
 | `kernel/apps/setting_display.h` | Display Properties (1.1-alpha-14): two tabs, Background (the desktop colour) and Settings (the screen area), like Windows 95. |
 | `kernel/apps/setting_dt.h` | The Control Panel's "Date/Time Properties" sheet (1.1-alpha-14), drawn like the Windows 95 one: two tabs (Date & Time, Time Zone -- a drop-down list of zones, a world map and the... |
 | `kernel/apps/setting_font.h` | Control Panel > Font (1.1-alpha-14): a Fonts folder in the manner of Windows 95. |
@@ -221,6 +225,7 @@ For how the pieces fit together see [ARCHITECTURE.md](ARCHITECTURE.md); for the 
 | `tools/test/host_critical_test.c` | Regression tests for the three "critical" findings of the 2026-10-08 bug audit (docs: MiniWin 버그 감사 보고서): C-01 ATA status polling must time out instead of hanging the kernel forever C-02... |
 | `tools/test/host_crypto_test.c` | Compiles MiniWin's REAL crypto headers on the build host (they are freestanding C, so they build fine against a hosted libc) and checks them against vectors from gen_crypto_vectors.py. |
 | `tools/test/host_css_bg_test.c` | CSS background colours, checked on real pixels: the page is laid out and painted by kernel/render.h into a small framebuffer and the colour of a chosen pixel is compared. |
+| `tools/test/host_cursor_test.c` | Host test for the pointer trails of kernel/ui/cursor.h (Settings > Mouse > Motion > "Show pointer trails"). |
 | `tools/test/host_dom_dump.c` | Dumps the DOM kernel/dom.h builds for an HTML file: a quick way to eyeball the tree builder. |
 | `tools/test/host_engine_test.c` | Deterministic tests for the HTML5 engine (kernel/dom.h, css.h, layout.h, render.h). |
 | `tools/test/host_img_test.c` | Kernel/img.h (the PNG / JPEG / GIF decoders of MiniWeb's <img>) on the real kernel code, against reference decodes made by Pillow. |
@@ -241,6 +246,7 @@ For how the pieces fit together see [ARCHITECTURE.md](ARCHITECTURE.md); for the 
 | `tools/test/host_tz_test.c` | Kernel/tz.h (1.1-alpha-14): the zone list, minute offsets and the daylight-saving rules, run on the real kernel code (only port I/O is stubbed). |
 | `tools/test/host_web_test.c` | Unit tests for kernel/httpresp.h (HTTP response handling). |
 | `tools/test/host_x509_test.c` | Certificate-extension handling (audit M-02): critical extensions we do not understand must make a certificate unacceptable, and keyUsage must agree with the certificate's role (TLS... |
+| `tools/test/mk_oobe_image.sh` | Usage: tools/test/mk_oobe_image.sh OUT.img -- a copy of the image whose root volume has no SYSTEM.CFG (as an installer would leave it) but has the licence texts |
 | `tools/test/mkcerts.sh` | Throwaway test PKI for the QEMU end-to-end TLS tests (tls_e2e.sh). |
 | `tools/test/qemu_iso.sh` | End-to-end test of the LIVE ISO in QEMU (1.1-alpha-13): 1. |
 | `tools/test/qemu_mon.py` | Drives a running QEMU through its monitor socket: a tiny script language, one command per argument. |
@@ -256,6 +262,7 @@ For how the pieces fit together see [ARCHITECTURE.md](ARCHITECTURE.md); for the 
 | `tools/test/run_host_critical.sh` | Host-side regression tests for the critical findings of the 2026-10-08 audit (ATA timeouts, partial program loads, TCP SYN-ACK validation + RX checksum). |
 | `tools/test/run_host_crypto.sh` | Host-side crypto unit tests: reference vectors from OpenSSL/hashlib vs MiniWin's actual kernel headers. |
 | `tools/test/run_host_css_bg.sh` | CSS background colours checked on painted pixels (kernel/render.h on the host). |
+| `tools/test/run_host_cursor.sh` | The pointer trails of kernel/ui/cursor.h with a fake clock and a canvas (ASan/UBSan). |
 | `tools/test/run_host_engine.sh` | Host-side tests for the HTML5 engine (dom/css/layout/render), then a burst of the ASan/UBSan fuzzer. |
 | `tools/test/run_host_font.sh` | The compressed Korean font: the checked-in header is up to date and round-trips, and the kernel's LZ4 decoder (kernel/lz.h) inflates it to exactly the bytes the generator says, and... |
 | `tools/test/run_host_img.sh` | The PNG / JPEG / GIF decoders -- against Pillow's decodes of tools/test/img_corpus/ (made with Pillow, plus hand-built Adam7 PNGs), with truncated and corrupted copies of every small... |

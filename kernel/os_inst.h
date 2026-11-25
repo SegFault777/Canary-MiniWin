@@ -174,6 +174,31 @@ static inline void inst_bootcode(void) {
     inst.mbr_result = INST_MBR_CHAIN;
 }
 
+/* defined later in the kernel (mm.h, ui/clock.h); the installer only uses them to copy the licence texts */
+static void *kmalloc(u32 n);
+static int kfree(void *p);
+static void append_str(char *buf, u32 *len, u32 maxlen, const char *s);
+/* The new root volume gets the licence texts the first-run setup shows (apps/oobe.h): /etc/LICENSE.TXT and /etc/LICENSE_KO.TXT of the system that is
+ * running the installer. A text that is missing or unreadable is skipped. */
+static inline void inst_copy_licenses(mwfs_vol_t *nv) {
+    static const char *const names[] = { "LICENSE.TXT", "LICENSE_KO.TXT" };
+    u32 etc = 0;
+    if (vfs_layout_dir(nv, "etc", &etc) != MWFS_OK) return;
+    for (int i = 0; i < 2; i++) {
+        char path[40]; u32 pn = 0; path[0] = 0;
+        append_str(path, &pn, sizeof path, "/etc/"); append_str(path, &pn, sizeof path, names[i]);
+        vfs_node_t n;
+        if (vfs_stat(path, &n) != MWFS_OK || n.type != MWFS_T_FILE) continue;
+        u32 sz = vfs_size(&n);
+        if (sz == 0 || sz > 98304u) continue;
+        u8 *b = (u8 *)kmalloc(sz);
+        if (!b) continue;
+        u32 len = 0, aux = 0;
+        if (vfs_read(path, b, sz, &len, &aux) == MWFS_OK && len == sz) mwfs_file_put(nv, etc, names[i], b, len, 0);
+        kfree(b);
+    }
+}
+
 /* Advances the job by up to `budget` sectors. Returns the phase afterwards. */
 static inline int inst_step(u32 budget) {
     u8 want[512], got[512];
@@ -186,6 +211,7 @@ static inline int inst_step(u32 budget) {
                 v.dev = inst.t.pos; v.base = inst.t.base + MW_ROOTFS_LBA; v.sectors = inst.root_sectors;
                 int e = mwfs_mkfs(&v, "MINIWIN");
                 if (e == MWFS_OK) e = vfs_make_root_layout(&v);
+                if (e == MWFS_OK) inst_copy_licenses(&v);                      /* best effort: the first-run setup says so if they are missing */
                 inst.fmt_err = e;
                 if (e != MWFS_OK) { inst_fail(INST_ERR_FORMAT, MW_ROOTFS_LBA); return inst.phase; }
                 inst.formatted = 1;

@@ -56,7 +56,7 @@ static void dt_open(void) {
     dt_today(&y, &m, &d);
     dt_vy = y; dt_vm = m; dt_sel = d;
 }
-static void dt_apply(void) { tz_zone = dt_p_zone; tz_dst_auto = dt_p_dst; clock_24h = dt_p_24; }
+static void dt_apply(void) { tz_zone = dt_p_zone; tz_dst_auto = dt_p_dst; clock_24h = dt_p_24; syscfg_touch(); }
 static int  dt_dirty(void) { return dt_p_zone != tz_zone || dt_p_dst != tz_dst_auto || dt_p_24 != clock_24h; }
 static void dt_back(void)  { setting_page = -1; setting_armed = -1; dt_btn_pressed = 0; dd_close(&dt_dd); }
 

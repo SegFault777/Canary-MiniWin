@@ -17,22 +17,31 @@
 #define FNT_ITEM_H (42 + 2 * FONT_LINE_H)
 #define FNT_BOTTOM 46                                  /* the strip under the list: a message line and the buttons */
 
+/* The Add Fonts dialog (setting_addfont.h) is part of this page: its state and entry points are declared here, the code comes after. */
+static int afd_on = 0;                                 /* the dialog is open: it gets the clicks and the keys */
+static void afd_open_dialog(const sheet_t *g);
+static void afd_draw(const sheet_t *g);
+static int afd_click(int mx, int my, u32 now);
+static void afd_release(int mx, int my);
+static int afd_key(int k);
+
 static int fnt_sel = 0;                                /* the selected face: an index into fontface_order[] */
 static int fnt_last_sel = -1;
 static u32 fnt_last_tick = 0;
 static int fnt_view = 0;                               /* 0 the folder, 1 the preview of the selected face */
 static int fnt_warn = -1;                              /* the pack index that waits for "use it anyway?" */
-static int fnt_btn_pressed = 0;                        /* 1 Use as System Font, 2 Done, 3 Yes, 4 No, 5 the kerning check box */
+static int fnt_btn_pressed = 0;                        /* 1 Use as System Font, 2 Done, 3 Yes, 4 No, 5 the kerning check box, 6 Size, 7 Install New Font */
 static const char *fnt_msg = 0;
 static lbx_t fnt_lb = { 0, 0, 0, 0, 15, 0, 0, 0 };     /* the compact list */
 
 static int fnt_idx(void) { return fontface_order[fnt_sel < fontface_count ? fnt_sel : 0]; }
 static void fnt_geo(sheet_t *g) { sheet_geo(g, setting.x, setting_body_y(), setting.w, setting_status_y(), 220, 66); }   /* small on purpose: a 320 x 200 screen leaves ~74 pixels */
 static void fnt_open(void) {
+    uft_scan();                                         /* the TrueType fonts in /lib/fonts */
     fontface_init_order();
     fnt_sel = 0;
     for (int i = 0; i < fontface_count; i++) if (fontface_order[i] == fontface_cur) fnt_sel = i;
-    fnt_last_sel = -1; fnt_view = 0; fnt_warn = -1; fnt_btn_pressed = 0; fnt_msg = 0;
+    fnt_last_sel = -1; fnt_view = 0; fnt_warn = -1; fnt_btn_pressed = 0; fnt_msg = 0; afd_on = 0;
     fontface_pv_free(); lbx_detach(&fnt_lb);
 }
 static void fnt_leave_preview(void) { fnt_view = 0; fontface_pv_free(); }
@@ -51,7 +60,12 @@ static int fnt_kern_x(const sheet_t *g) { return g->X + g->W - 8 - 19 - ko_strin
 #define FNT_ASK_W 262
 #define FNT_ASK_H 84
 static void fnt_ask_geo(const sheet_t *g, int *x, int *y) { *x = g->X + (g->W - FNT_ASK_W) / 2; *y = g->Y + (g->H - FNT_ASK_H) / 2; }
-static int fnt_can_use(void) { return fontface_count > 1 && fnt_idx() != fontface_cur; }
+static int fnt_can_use(void) { return fontface_count > 1 && !fontface_in_use(fnt_idx()); }
+static const char *fnt_inst_label(void) { return SKO("Install New Font...", "새 글꼴 설치..."); }
+static int fnt_inst_w(void) { return ko_string_width(fnt_inst_label()) + 24; }
+static int fnt_inst_x(const sheet_t *g) { return g->X + 8 + fnt_use_w() + 8; }
+static int fnt_inst_fits(const sheet_t *g) { return fnt_inst_x(g) + fnt_inst_w() + 8 < fnt_kern_x(g); }     /* the folder's button row is crowded on a narrow window: the menu has it too */
+static int fnt_size_x(const sheet_t *g) { return g->X + 8 + fnt_use_w() + 8 + 80 + 8; }
 
 static int fnt_btn_hit(int mx, int my) {
     sheet_t g; fnt_geo(&g);
@@ -65,6 +79,8 @@ static int fnt_btn_hit(int mx, int my) {
     int by = fnt_btn_y(&g);
     if (fnt_can_use() && in_rect(mx, my, g.X + 8, by, fnt_use_w(), 22)) return 1;
     if (fnt_view == 1 && in_rect(mx, my, g.X + 8 + fnt_use_w() + 8, by, 80, 22)) return 2;
+    if (fnt_view == 1 && fontface_is_ttf(fnt_idx()) && in_rect(mx, my, fnt_size_x(&g), by, 96, 22)) return 6;
+    if (fnt_view == 0 && fnt_inst_fits(&g) && in_rect(mx, my, fnt_inst_x(&g), by, fnt_inst_w(), 22)) return 7;
     if (fnt_view == 0 && in_rect(mx, my, fnt_kern_x(&g), by + 4, 19 + ko_string_width(SKO("Kerning", "커닝")), 13)) return 5;
     return 0;
 }
@@ -121,19 +137,25 @@ static void fnt_draw(void) {
         if (fnt_msg) ko_draw_mixed_string(g.X + 8, g.Y + g.H - FNT_BOTTOM + 4, fnt_msg, TH_ACCENT);
         else if (fontface_count < 2) ko_draw_mixed_string(g.X + 8, g.Y + g.H - FNT_BOTTOM + 4, SKO("More fonts are on the full disc.", "더 많은 글꼴은 전체 디스크에 있습니다."), TH_SHADOW);
         ui_checkbox_label(fnt_kern_x(&g), by + 4, SKO("Kerning", "커닝"), font_kerning, 1);
+        if (fnt_inst_fits(&g)) ui_pushbutton(fnt_inst_x(&g), by, fnt_inst_w(), 22, fnt_inst_label(), fnt_btn_pressed == 7, 1);
     } else {
         int idx = fnt_idx(), lh = FONT_LINE_H;
         fontface_name(idx, nm, sizeof nm);
         ko_draw_mixed_string(g.X + 10, g.Y + 8, nm, TH_TEXT);
         char info[64]; u32 n = 0; info[0] = 0;
-        append_str(info, &n, sizeof(info), SKO("Bitmap font, ", "비트맵 글꼴, "));
-        { char d[4]; int c = fp_ent[idx].cell, nd = 0; if (c >= 10) d[nd++] = (char)('0' + c / 10); d[nd++] = (char)('0' + c % 10); d[nd] = 0; append_str(info, &n, sizeof(info), d); }
+        append_str(info, &n, sizeof(info), fontface_is_ttf(idx) ? SKO("TrueType font, ", "트루타입 글꼴, ") : SKO("Bitmap font, ", "비트맵 글꼴, "));
+        { char d[4]; int c = fontface_cell(idx), nd = 0; if (c >= 10) d[nd++] = (char)('0' + c / 10); d[nd++] = (char)('0' + c % 10); d[nd] = 0; append_str(info, &n, sizeof(info), d); }
         append_str(info, &n, sizeof(info), SKO(" pixels", " 픽셀"));
         ko_draw_mixed_string(g.X + 10, g.Y + 8 + lh, info, TH_TEXT);
         int sx = g.X + 8, sy = g.Y + 8 + 2 * lh + 8, sw = g.W - 16, sh = by - 8 - sy;
         ui_field(sx, sy, sw, sh, TH_FIELD, 0);
         fnt_draw_samples(sx, sy, sw, sh);
         ui_pushbutton(g.X + 8 + fnt_use_w() + 8, by, 80, 22, SKO("Done", "닫기"), fnt_btn_pressed == 2, 1);
+        if (fontface_is_ttf(idx)) {                                                    /* a TrueType font can be drawn at the sizes of the Galmuri faces */
+            char sz[24]; u32 m = 0; sz[0] = 0;
+            append_str(sz, &m, sizeof sz, SKO("Size: ", "크기: ")); { char d[4]; int c = fontface_cell(idx), nd = 0; if (c >= 10) d[nd++] = (char)('0' + c / 10); d[nd++] = (char)('0' + c % 10); d[nd] = 0; append_str(sz, &m, sizeof sz, d); }
+            ui_pushbutton(fnt_size_x(&g), by, 96, 22, sz, fnt_btn_pressed == 6, 1);
+        }
     }
     ui_pushbutton(g.X + 8, by, fnt_use_w(), 22, fnt_use_label(), fnt_btn_pressed == 1 && fnt_can_use(), fnt_can_use());
     if (fnt_warn >= 0) {                                                               /* "this font is very small: use it anyway?" */
@@ -145,17 +167,23 @@ static void fnt_draw(void) {
         ui_pushbutton(x + FNT_ASK_W / 2 - 76, y + FNT_ASK_H - 28, 70, 22, SKO("Yes", "예"), fnt_btn_pressed == 3, 1);
         ui_pushbutton(x + FNT_ASK_W / 2 + 6, y + FNT_ASK_H - 28, 70, 22, SKO("No", "아니요"), fnt_btn_pressed == 4, 1);
     }
+    if (afd_on && fnt_view == 0) afd_draw(&g);                                         /* Install New Font: the dialog, over the folder */
 }
 
 /* ---- actions ---- */
 static void fnt_do_apply(int idx) {
     if (!fontface_use(idx)) { fnt_msg = SKO("The font could not be loaded.", "글꼴을 불러올 수 없습니다."); return; }
+    if (fontface_is_ttf(idx)) {                                                         /* kept for the next boots if it lives in /lib/fonts (fonttf.h) */
+        if (uft_save_cfg(idx - fp_n)) { fontface_pref = UFT_PREF; fnt_msg = fontface_save_pref() ? 0 : SKO("Used until the computer is restarted.", "컴퓨터를 다시 시작할 때까지만 사용됩니다."); }
+        else fnt_msg = SKO("Used until the computer is restarted.", "컴퓨터를 다시 시작할 때까지만 사용됩니다.");
+        return;
+    }
     fontface_pref = idx + 1;
     fnt_msg = fontface_save_pref() ? 0 : SKO("Used until the computer is restarted.", "컴퓨터를 다시 시작할 때까지만 사용됩니다.");
 }
 static void fnt_apply(int idx) {
-    if (idx == fontface_cur) { fnt_msg = SKO("That font is already in use.", "이미 사용 중인 글꼴입니다."); return; }
-    if (fp_ent[idx].cell <= 7) { fnt_warn = idx; return; }
+    if (fontface_in_use(idx)) { fnt_msg = SKO("That font is already in use.", "이미 사용 중인 글꼴입니다."); return; }
+    if (fontface_cell(idx) <= 7) { fnt_warn = idx; return; }
     fnt_do_apply(idx);
 }
 static void fnt_fire(int b) {
@@ -164,13 +192,39 @@ static void fnt_fire(int b) {
     else if (b == 3) { int i = fnt_warn; fnt_warn = -1; if (i >= 0) fnt_do_apply(i); }
     else if (b == 4) fnt_warn = -1;
     else if (b == 5) font_kerning = !font_kerning;
+    else if (b == 6) {                                                                 /* the next size of this TrueType font, built again */
+        int idx = fnt_idx(); uft_ent_t *e = &uft_ent[idx - fp_n];
+        e->cell = (u8)uft_next_cell(e->cell);
+        fontface_pv_free();
+        if (!fontface_pv_load(idx)) { fnt_view = 0; fnt_msg = SKO("The font could not be loaded.", "글꼴을 불러올 수 없습니다."); }
+    }
+    else if (b == 7) { sheet_t g; fnt_geo(&g); afd_open_dialog(&g); }
 }
 static void fnt_release(int mx, int my) {
+    if (afd_on) { afd_release(mx, my); return; }
     int b = fnt_btn_pressed;
     fnt_btn_pressed = 0;
     if (b && fnt_btn_hit(mx, my) == b) fnt_fire(b);
 }
+/* Is (mx,my) on the folder's list area (icons or plain list)? And which face is there, as a position in the list (a value of fnt_sel), or -1. */
+static int fnt_folder_hit(int mx, int my) {
+    sheet_t g; fnt_geo(&g);
+    if (!g.ok || fnt_warn >= 0 || fnt_view != 0 || afd_on) return 0;
+    return in_rect(mx, my, g.X + 2, g.Y + 2, g.W - 4, g.H - FNT_BOTTOM);
+}
+static int fnt_item_at(int mx, int my) {
+    if (!fnt_folder_hit(mx, my)) return -1;
+    sheet_t g; fnt_geo(&g);
+    int lx = g.X + 2, ly = g.Y + 2, lw = g.W - 4, i = -1;
+    if (fnt_list_icons(&g)) {
+        int cols = (lw - 8) / FNT_ITEM_W; if (cols < 1) cols = 1;
+        int cx = mx - lx - 4, cy = my - ly - 4;
+        if (cx >= 0 && cy >= 0) { int c = cx / FNT_ITEM_W, r = cy / FNT_ITEM_H; if (c < cols) i = r * cols + c; }
+    } else if (my >= ly + 2) i = (my - ly - 2) / (FONT_CELL + 4) + fnt_lb.top;
+    return (i >= 0 && i < fontface_count) ? i : -1;
+}
 static int fnt_click(int mx, int my, u32 now) {
+    if (afd_on) return afd_click(mx, my, now);
     sheet_t g; fnt_geo(&g);
     int b = fnt_btn_hit(mx, my);
     if (b) { if (b != 1 || fnt_can_use()) fnt_btn_pressed = b; return 1; }
@@ -196,6 +250,7 @@ static int fnt_click(int mx, int my, u32 now) {
 /* Arrows move the selection, Enter opens the preview (or uses the face, in it), Esc backs out of the preview or the question. 1 = used. */
 static int fnt_key(int k) {
     if (setting_page != SP_TEXT) return 0;
+    if (afd_on) return afd_key(k);
     if (fnt_warn >= 0) { if (k == '\n') fnt_fire(3); else if (k == 27) fnt_fire(4); return 1; }
     if (fnt_view == 1) { if (k == 27) { fnt_leave_preview(); return 1; } if (k == '\n') { if (fnt_can_use()) fnt_apply(fnt_idx()); return 1; } return 0; }
     if ((k == KEY_LEFT || k == KEY_UP) && fnt_sel > 0) { fnt_sel--; fnt_msg = 0; return 1; }
@@ -205,9 +260,11 @@ static int fnt_key(int k) {
     return 0;
 }
 static void fnt_menu_action(int menu, int item) {
+    if (afd_on) return;                                                                 /* the dialog is modal */
     if (menu == 0) {
         if (item == 0) { if (fnt_view == 0) fnt_open_preview(); }
         else if (item == 1) { if (fnt_can_use()) fnt_apply(fnt_idx()); }
+        else if (item == 2) { if (fnt_view == 0) { sheet_t g; fnt_geo(&g); if (g.ok) afd_open_dialog(&g); } }
         else { setting.open = 0; fontface_pv_free(); }
     } else if (menu == 1) {
         if (item == 0) font_kerning = !font_kerning;

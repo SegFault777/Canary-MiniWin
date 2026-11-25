@@ -11,6 +11,8 @@ USB devices, the time) and **Help**; every Tools item simply types the command f
 
 ## Files and directories
 
+`whoami` says your user name (or `root`).
+
 **User and root.** MiniShell starts as a *user* (prompt ends in `$`). `root` asks for the root password (the first time it asks you to choose
 one) and makes the session root (prompt ends in `#`); `user` goes back. Root may change the system folders (`/boot /dev /etc /bin /lib /sys
 /proc /var` and the top level of `/`) that MiniFiles and programs can only look at, see [FILES-AND-DISKS.md](FILES-AND-DISKS.md). A user

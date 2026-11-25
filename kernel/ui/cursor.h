@@ -46,17 +46,23 @@ static void draw_cursor_shape(int x, int y, const char *const *rows, int nrows) 
 }
 
 /* POINTER TRAILS (Settings > Mouse > Motion, 1.1-alpha-14): with cursor_trail_n > 0 the last cursor_trail_n positions, sampled every 28 ms, are drawn as
- * ghost copies of the pointer behind it. Stand still and they all sit under the real pointer, so it is just one pointer again. */
+ * ghost copies of the pointer behind it (the newest sample is the pointer's own place, so n samples show n-1 ghosts). Stand still and they all sit under the real pointer, so it is just one pointer again. */
 static int cursor_trail_n = 0;                                      /* 0 = off, else how many ghosts (2 .. 8) */
 static int cursor_trail_x[8], cursor_trail_y[8];
 static u32 cursor_trail_t = 0;
+static int cursor_trail_live = 0;                                  /* the history holds real positions (it is filled with the pointer's own when the trail is switched on) */
 static u32 mwp_sys_ticks_ms(void);                                  /* mwp_api2.h: the millisecond clock */
 
 static void draw_cursor(int x, int y) {
     const cursor_shape_t *s = &cursor_shapes[cursor_pick(x, y)];
-    if (cursor_trail_n > 0) {
+    if (cursor_trail_n <= 0) cursor_trail_live = 0;
+    else {
         static int frames = 0;
         u32 now = mwp_sys_ticks_ms();
+        if (!cursor_trail_live) {                                   /* switched on: start from where the pointer is, not from (0,0) or from where it was last time */
+            for (int i = 0; i < 8; i++) { cursor_trail_x[i] = x; cursor_trail_y[i] = y; }
+            cursor_trail_t = now; frames = 0; cursor_trail_live = 1;
+        }
         frames++;
         /* a sample every 28 ms -- or, when the millisecond clock does not run (no usable TSC), every 6th frame, so the trail still follows */
         if ((int)(now - cursor_trail_t) >= 28 || (int)(now - cursor_trail_t) < 0 || frames >= 6) {

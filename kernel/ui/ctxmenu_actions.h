@@ -10,12 +10,14 @@
  * Paste Shortcut, Undo Delete, Arrange / Line up Icons, ... are drawn greyed -- there is no feature behind them yet, and a menu that pretended
  * would be worse than one that says so. Needs MiniFiles (minifiles.h), the wizard (apps/startmenu_add.h) and the desktop icons. */
 
-enum { PM_DESKTOP = 1, PM_ICON, PM_FILE_ITEM, PM_FILE_BG, PM_NOTEPAD, PM_PROGRAM, PM_TEXTFIELD, PM_WEB };
+enum { PM_DESKTOP = 1, PM_ICON, PM_FILE_ITEM, PM_FILE_BG, PM_NOTEPAD, PM_PROGRAM, PM_TEXTFIELD, PM_WEB, PM_TERM, PM_SETTING };
 enum { PMI_NONE = 0, PMI_OPEN, PMI_NEW_NOTE, PMI_NEW_SHORTCUT, PMI_PROPS_DISPLAY,
        PMI_FCUT, PMI_FCOPY, PMI_FPASTE, PMI_FDELETE, PMI_FRENAME, PMI_FNEWFOLDER, PMI_FREFRESH, PMI_FVIEW_FOLDERS, PMI_FVIEW_DISKS, PMI_FSORT0 = 40 /* +0..3 */,
        PMI_NUNDO = 50, PMI_NCUT, PMI_NCOPY, PMI_NPASTE, PMI_NDELETE, PMI_NSELALL,
        PMI_TCUT = 60, PMI_TCOPY, PMI_TPASTE, PMI_TDELETE, PMI_TSELALL,
-       PMI_WOPEN = 70, PMI_WCOPYLINK, PMI_WBACK, PMI_WFORWARD, PMI_WREFRESH, PMI_WHOME };   /* MiniWeb's page */      /* the one-line text fields (ui/textfield.h) */
+       PMI_WOPEN = 70, PMI_WCOPYLINK, PMI_WBACK, PMI_WFORWARD, PMI_WREFRESH, PMI_WHOME,
+       PMI_SCOPYALL = 80, PMI_SPASTE, PMI_SCLEAR,                          /* MiniShell's output */
+       PMI_COPEN = 90, PMI_FNTOPEN, PMI_FNTUSE, PMI_FNTINSTALL };           /* Control Panel: an icon, a font, the Fonts folder */   /* MiniWeb's page */      /* the one-line text fields (ui/textfield.h) */
 
 /* ---- the desktop ---- */
 static const pm_item_t pmd_new[] = {
@@ -99,6 +101,24 @@ static const pm_item_t pm_web_link[] = {
     { "Back", "뒤로", MBF_SEP, PMI_WBACK, "Goes back to the previous page.", 0, 0 },
     { "Forward", "앞으로", 0, PMI_WFORWARD, "Goes forward to the next page.", 0, 0 },
     { "Refresh", "새로 고침", 0, PMI_WREFRESH, "Loads this page again.", 0, 0 },
+};
+/* ---- MiniShell's output (the command line has the text-field menu) ---- */
+static const pm_item_t pm_term[] = {
+    { "Copy All", "모두 복사", 0, PMI_SCOPYALL, "Copies everything in this window to the Clipboard (the newest 4096 bytes if there is more).", 0, 0 },
+    { "Paste", "붙여넣기", 0, PMI_SPASTE, "Inserts the Clipboard into the command line.", 0, 0 },
+    { "Clear", "지우기", MBF_SEP, PMI_SCLEAR, "Empties this window.", 0, 0 },
+};
+/* ---- Control Panel: an icon of the grid, a font of the Fonts folder, the bare Fonts folder ---- */
+static const pm_item_t pm_cp_icon[] = {
+    { "Open", "열기", MBF_BOLD, PMI_COPEN, "Opens this item.", 0, 0 },
+};
+static const pm_item_t pm_fonts_item[] = {
+    { "Open", "열기", MBF_BOLD, PMI_FNTOPEN, "Shows this font.", 0, 0 },
+    { "Use as System Font", "시스템 글꼴로 사용", 0, PMI_FNTUSE, "Makes this font the font of the whole desktop.", 0, 0 },
+    { "Install New Font...", "새 글꼴 설치...", MBF_SEP, PMI_FNTINSTALL, "Adds TrueType fonts from a folder or a disk.", 0, 0 },
+};
+static const pm_item_t pm_fonts_bg[] = {
+    { "Install New Font...", "새 글꼴 설치...", 0, PMI_FNTINSTALL, "Adds TrueType fonts from a folder or a disk.", 0, 0 },
 };
 static const pm_item_t pm_web_page[] = {
     { "Back", "뒤로", 0, PMI_WBACK, "Goes back to the previous page.", 0, 0 },
@@ -208,6 +228,13 @@ static void pm_run(int kind, int arg, int id) {
         if (id == PMI_NUNDO) np_edit_undo(); else if (id == PMI_NCUT) np_edit_copy(1); else if (id == PMI_NCOPY) np_edit_copy(0);
         else if (id == PMI_NPASTE) np_edit_paste(); else if (id == PMI_NDELETE) np_edit_delete(); else np_edit_select_all();
         break;
+    case PMI_SCOPYALL: term_copy_all(); break;
+    case PMI_SPASTE: pm_tf_kind = TFT_TERM; term_input_focused = 1; pm_tf_run(PMI_TPASTE); break;
+    case PMI_SCLEAR: term_clear_output(); break;
+    case PMI_COPEN: setting_sel = arg; setting_open_item(arg); break;
+    case PMI_FNTOPEN: fnt_sel = arg; fnt_msg = 0; fnt_open_preview(); break;
+    case PMI_FNTUSE: fnt_sel = arg; fnt_msg = 0; if (fnt_can_use()) fnt_apply(fnt_idx()); break;
+    case PMI_FNTINSTALL: { sheet_t g; fnt_geo(&g); if (g.ok) afd_open_dialog(&g); break; }
     case PMI_WOPEN: web_urlbar_focused = 0; web_navigate_ref(pm_web_href); break;
     case PMI_WCOPYLINK: { char u[WEB_PATH_MAX + 120]; if (web_ref_to_url(pm_web_href, u, sizeof(u))) clip_set(u, tf_len(u)); break; }
     case PMI_WBACK: web_tb_fire(0); break;
@@ -300,6 +327,30 @@ static void pm_web_context(int px, int py) {
     }
 }
 
+/* MiniShell: the command line has the text-field menu; the black output area its own (Copy All, Paste, Clear). */
+static void pm_term_context(int px, int py) {
+    win_z_raise(WIN_ID_TERMINAL); mb_close();
+    if (!term_output_hit(px, py)) return;
+    pm_begin(pm_term, 3, px, py, PM_TERM, 0);
+    pm_set_off(0, term_scroll_count <= 0); pm_set_off(1, !clip_len); pm_set_off(2, term_scroll_count <= 0);
+}
+/* Control Panel: on an icon of the grid, on a font (or the empty part) of the Fonts folder. Open pages have no menu. */
+static void pm_setting_context(int px, int py) {
+    win_z_raise(WIN_ID_SETTING); mb_close();
+    if (afd_on) return;                                                 /* the Add Fonts dialog is modal */
+    if (setting_page < 0) {
+        cp_grid_t g; cp_grid(&g);
+        int i = cp_cell_at(&g, px, py);
+        if (i >= 0) { setting_sel = i; pm_begin(pm_cp_icon, 1, px, py, PM_SETTING, i); }
+        return;
+    }
+    if (setting_page == SP_TEXT && fnt_view == 0) {
+        int i = fnt_item_at(px, py);
+        if (i >= 0) { fnt_sel = i; fnt_msg = 0; pm_begin(pm_fonts_item, 3, px, py, PM_SETTING, i); pm_set_off(1, !fnt_can_use()); }
+        else if (fnt_folder_hit(px, py)) pm_begin(pm_fonts_bg, 1, px, py, PM_SETTING, -1);
+    }
+}
+
 static void pm_context_at(int px, int py) {
     pm_close();
     if (start_menu_open || clock_popup_open || py >= TASKBAR_Y) return;
@@ -309,6 +360,8 @@ static void pm_context_at(int px, int py) {
     if (hit_id == WIN_ID_WEB && web_urlbar_hit(px, py)) { win_z_raise(WIN_ID_WEB); mb_close(); web_urlbar_focused = 1; rd_focus = 0; pm_tf_open(TFT_WEB, px, py); return; }
     if (hit_id == WIN_ID_WEB) { pm_web_context(px, py); return; }
     if (hit_id == WIN_ID_TERMINAL && term_input_hit(px, py)) { win_z_raise(WIN_ID_TERMINAL); mb_close(); term_input_focused = 1; pm_tf_open(TFT_TERM, px, py); return; }
+    if (hit_id == WIN_ID_TERMINAL) { pm_term_context(px, py); return; }
+    if (hit_id == WIN_ID_SETTING) { pm_setting_context(px, py); return; }
     if (hit_id >= 0) return;                                            /* the other windows have no menu yet */
 
     int icon = -1;                                                      /* the desktop: first an icon... */

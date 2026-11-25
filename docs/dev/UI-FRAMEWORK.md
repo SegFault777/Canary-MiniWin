@@ -75,3 +75,20 @@ syllables as you type; **Right Alt** cycles the active input method. UI strings 
    (`ICONC_*`, `memmap.h` cache size) and a start-menu entry.
 3. Strings in both languages; a golden screenshot step in `tools/test/ui_golden.sh` and a re-recorded golden (see
    [TESTING.md](TESTING.md)).
+
+## Right-click menus (`ui/ctxmenu.h`, `ui/ctxmenu_actions.h`)
+
+`ctxmenu.h` is the machinery (one popup anywhere, an optional one-level submenu, Windows 95 look, help line in the status bar);
+`ctxmenu_actions.h` says what each menu holds and does. To add one:
+
+1. a kind in `enum { PM_DESKTOP = 1, ... PM_TERM, PM_SETTING }` and item ids in `enum { PMI_... }` (keep the groups of ids apart);
+2. a `static const pm_item_t pm_xxx[]` table `{ "English", "한글", flags, id, "help line", 0, 0 }` (flags `MBF_SEP` = a separator above,
+   `MBF_BOLD` = the default action, `MBF_OFF` = greyed, `PMF_SUB` = has a submenu);
+3. a `pm_xxx_context(px, py)` function that decides whether the point is on something the menu belongs to, raises the window, closes the
+   menu bar (`mb_close()`), then `pm_begin(table, n, px, py, kind, arg)` and greys items with `pm_set_off(i, cond)` for the state at that moment;
+4. a call from `pm_context_at()` for the window the click landed on (`hit_id`);
+5. the action in `pm_run()`'s `switch (id)`: `arg` is what `pm_begin` was given (an icon, a row, a face index).
+
+The menus of MiniShell's output (Copy All, Paste, Clear: `term_copy_all()`, `term_clear_output()`, `term_output_hit()`) and of the
+Control Panel (an icon of the grid, a font or the bare Fonts folder: `fnt_item_at()`, `fnt_folder_hit()`) are the latest examples. Text
+selection in MiniShell's output does not exist yet, so *Copy All* is the one copy there is.

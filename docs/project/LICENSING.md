@@ -77,3 +77,9 @@ Put `SPDX-License-Identifier: GPL-3.0-only` on the first line (after a `#!` line
 write, in the comment style of the language (`/* ... */` for C and linker scripts, `;` for NASM, `#` for shell and
 Python). A file that is *generated from third-party data* does not get the line; add its notice to
 `third_party/<name>/NOTICE.md` instead.
+
+## The licence texts
+
+`LICENSE` is the GNU GPL 3.0 as published by the Free Software Foundation. `LICENSE.ko.txt` is a Korean translation of it, *unofficial*: like every
+translation of the GPL it is not published by the FSF and does not state the distribution terms of the software, only the English original does. Both are
+shown, in full, by the first-run setup (the Korean one when the language is Korean) and installed as `/etc/LICENSE.TXT` and `/etc/LICENSE_KO.TXT`.

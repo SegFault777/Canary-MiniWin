@@ -139,4 +139,25 @@ static rtc_time_t rtc_apply_offset(rtc_time_t t, int offset_hours) {
     return t;
 }
 
+
+/* Sets the CMOS clock to `t` (the same UTC reading rtc_read() gives; the time zone is the caller's business). Updates are halted while the
+ * registers are written (status register B bit 7) and the format the chip is in (BCD or binary, 12 or 24 hours) is kept. The century is not
+ * written (rtc_read() assumes 20xx). Used by the first-run setup (apps/oobe.h); the Date/Time sheet only reads the clock. */
+static inline void cmos_write(u8 reg, u8 v) { outb(CMOS_ADDR, reg); outb(CMOS_DATA, v); }
+static inline u8 bin_to_bcd(u8 v) { return (u8)(((v / 10) << 4) | (v % 10)); }
+static void rtc_write(const rtc_time_t *t) {
+    for (u32 i = 0; i < 1000000 && cmos_update_in_progress(); i++) { }
+    u8 b = cmos_read(0x0B);
+    int bin = b & 0x04, h24 = b & 0x02;
+    u8 hour = (u8)t->hour, pm = 0;
+    if (!h24) { pm = hour >= 12; hour %= 12; if (hour == 0) hour = 12; }
+    u8 sec = (u8)t->second, min = (u8)t->minute, day = (u8)t->day, mon = (u8)t->month, yr = (u8)(t->year % 100), wd = (u8)(compute_weekday(t->year, t->month, t->day) + 1);
+    if (!bin) { sec = bin_to_bcd(sec); min = bin_to_bcd(min); hour = bin_to_bcd(hour); day = bin_to_bcd(day); mon = bin_to_bcd(mon); yr = bin_to_bcd(yr); wd = bin_to_bcd(wd); }
+    if (!h24 && pm) hour |= 0x80;
+    cmos_write(0x0B, (u8)(b | 0x80));
+    cmos_write(0x00, sec); cmos_write(0x02, min); cmos_write(0x04, hour);
+    cmos_write(0x06, wd); cmos_write(0x07, day); cmos_write(0x08, mon); cmos_write(0x09, yr);
+    cmos_write(0x0B, (u8)(b & ~0x80));
+}
+
 #endif

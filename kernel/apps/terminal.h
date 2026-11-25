@@ -285,6 +285,7 @@ static void term_cmd_help(void) {
     term_print("?          - show this list");
     term_print("root       - become the root account");
     term_print("user       - go back to the user account");
+    term_print("whoami     - who you are: your name, or root");
     term_print("ls [dir]   - list a directory  (dir)");
     term_print("cd <dir>   - change directory (cd = /)");
     term_print("pwd        - show the current directory");
@@ -956,6 +957,8 @@ static void term_run_input_inner(void) {
     } else if (term_streq(tokens[0], "root")) {
         if (term_is_root) term_print("  you are root already");
         else { term_pw_mode = term_pw_is_set() ? TP_LOGIN : TP_NEW; if (term_pw_mode == TP_NEW) term_print("  there is no root password yet: choose one"); }
+    } else if (term_streq(tokens[0], "whoami")) {
+        { char w[64]; u32 m = 0; w[0] = 0; append_str(w, &m, sizeof w, "  "); append_str(w, &m, sizeof w, term_is_root ? "root" : sys_user); term_print(w); }
     } else if (term_streq(tokens[0], "user")) {
         if (!term_is_root) term_print("  you are a user already");
         else { term_is_root = 0; term_print("  you are a user now"); }
@@ -1029,6 +1032,29 @@ static void term_draw_row(int x, int y, char *s, u32 color) {
         s[i] = sv;
     }
 }
+/* The window's whole text (oldest line first, one per line) onto the Clipboard; if it is longer than CLIP_MAX the newest lines that fit. 0 = nothing to copy. */
+static int term_copy_all(void) {
+    static char buf[CLIP_MAX + 1];
+    if (!term_sb || term_scroll_count <= 0) return 0;
+    int n = term_scroll_count, start = (term_scroll_head - n + TERM_SCROLLBACK_ROWS) % TERM_SCROLLBACK_ROWS, first = n;
+    u32 total = 0;
+    while (first > 0) {                                                   /* from the newest line backwards while they fit */
+        const char *r = term_sb[(start + first - 1) % TERM_SCROLLBACK_ROWS]; u32 l = 0; while (r[l]) l++;
+        if (total + l + 1 > CLIP_MAX) break;
+        total += l + 1; first--;
+    }
+    u32 len = 0;
+    for (int k = first; k < n; k++) {
+        const char *r = term_sb[(start + k) % TERM_SCROLLBACK_ROWS];
+        for (u32 i = 0; r[i]; i++) buf[len++] = r[i];
+        buf[len++] = '\n';
+    }
+    if (len) len--;                                                       /* no newline after the last line */
+    return len ? clip_set(buf, len) : 0;
+}
+/* Empties the window (the command line stays). */
+static void term_clear_output(void) { term_scroll_count = 0; term_scroll_head = 0; term_scroll_off = 0; term_hscroll = 0; }
+
 static inline int term_input_flags(void) { return term_pw_mode != TP_NONE ? TF_PASS : TF_ASCII; }   /* a password prompt shows stars and cannot be copied */
 static int term_input_hit(int px, int py) {
     return in_rect(px, py, term_input_x(), term_input_y(), term_input_w(), TERM_INPUT_H);
@@ -1043,6 +1069,7 @@ static int term_wrap_cols(void) { int c = term_vis_cols(); return c < TERM_COLS_
  * bottom of the black area (the text then has one row less -- the rows are derived from the height AFTER this). */
 static inline int term_hbar_shown(void) { return term_max_len() > term_vis_cols(); }
 static inline int term_output_h(void) { return term_input_y() - term_output_y() - 3 - (term_hbar_shown() ? SB_W : 0); }
+static inline int term_output_hit(int px, int py) { return in_rect(px, py, term_win.x + 4, term_output_y(), term_win.w - 8, term_output_h()); }
 static inline int term_hbar_y(void) { return term_output_y() + term_output_h(); }
 static int term_visible_rows(void) { int n = (term_output_h() - 2) / FONT_LINE_H; return n < 1 ? 1 : n; }
 

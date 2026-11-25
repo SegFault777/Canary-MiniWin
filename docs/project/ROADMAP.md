@@ -50,8 +50,75 @@ same way (`tools/gen_hangul_font.py` has the compressor), moving `.bss` tables t
 * **1.1-alpha-16**: the source tree changes shape: modules written as headers (like `css.h`) become directories of `.c` files
   (`css/dom.c`, `css/layout.c`, ...), everywhere -- together with some of the essential features of a modern OS. Among those: **more file
   systems, read-only first**: a **FAT family** reader (FAT12/16/32 and **exFAT**), an **ext family** reader (ext2/3/4), and a **minimal NTFS**
-  reader; and a **stronger MWFS**, MiniWin's own file system.
-* After alpha-16 comes **beta-1**; what follows it is not decided yet.
+  reader; and a **stronger MWFS**, MiniWin's own file system. **Decided 2026-11-19: alpha-16 only READS foreign file systems** (FAT, ext and
+  a partial NTFS); writing to FAT and ext2 comes in beta-9, writing to NTFS is not planned.
+* After alpha-16 comes the **beta series**: it closes the gaps listed in [Beta: closing the gaps](#beta-closing-the-gaps) one step at a time.
+
+## Beta: closing the gaps
+
+The author's decision (2026-11-18): after alpha-16 the beta releases remove, step by step, what MiniWin still lacks. The list is the author's;
+**the order below was confirmed by the author on 2026-11-19** (it follows what depends on what). Every step keeps the rule of the alphas: the host
+tests grow with the feature, the docs and the changelog say what is true, and nothing is called done that has only run on QEMU.
+
+### What is missing today
+
+| gap | state today |
+|---|---|
+| IPv6 | IPv4 only (`ip.h`, `arp.h`, `dhcp.h`, `dns.h` know no IPv6) |
+| IP fragmentation / reassembly | none: we send every datagram as one frame with DF set and `ip.h` does not reassemble |
+| TCP sliding window | stop-and-wait with a fixed number of retries; the peer's window is respected (`tcp.h`), our own is at most the 32 KB receive buffer, no window scaling, no congestion control, no SACK |
+| Standard socket API | MiniWin's own calls (`net.h`, the MWP network calls); no BSD `socket()`/`bind()`/`listen()`/`accept()` |
+| `select` / `poll` | none; everything is polled in the main loop |
+| CLI / TUI browser | MiniWeb is graphical only |
+| Web image decode | `img.h` decodes PNG, baseline JPEG and the first GIF frame; progressive JPEG, animated GIF, WebP, BMP/ICO and SVG are missing |
+| Cookies / sessions | none: `http.h`/`https.h` send and keep no cookies, `document.cookie` reads as an empty string, a site that insists on cookies ends in "Too many redirects" |
+| JSON / XML API | JavaScript has `JSON.parse` / `JSON.stringify` (`js.h`); there is no XML parser (`DOMParser`), no `fetch` / `XMLHttpRequest` for scripts, and no JSON or XML parser a native program can call |
+| SSH / Telnet | none |
+| SMP | one CPU; the others are never started |
+| Scheduler | none: one program runs at a time and the kernel never enables interrupts (everything is polled) |
+| General synchronization primitives | none (a single thread of control needs none yet) |
+| IPC | none |
+| Copy-on-write | none |
+| Swap | none |
+| FAT / ext2 | none until the alpha-16 readers; those are read-only |
+| ELF | programs are `.MWP` only |
+| POSIX compatibility | none |
+
+### The order
+
+* **beta-1: interrupts and a scheduler.** IDT, PIC/APIC timer, interrupt-driven timekeeping, a process/thread table, a preemptive
+  round-robin scheduler with priorities, sleeping and waking. Builds on alpha-14 (ring 3) and alpha-15 (process protection). Everything
+  below needs this, because blocking calls need something to switch to.
+* **beta-2: synchronization and IPC.** Spinlocks, mutexes, semaphores, condition variables and wait queues; then pipes, message queues
+  and shared memory between programs.
+* **beta-3: the TCP/IP core.** IP fragmentation and reassembly (with a reassembly timeout and a memory cap), then a real TCP sliding
+  window: window scaling, a send window with several segments in flight, fast retransmit, congestion control, delayed ACKs.
+* **beta-4: IPv6.** Addresses and the dual-stack choice, neighbour discovery (replaces ARP), ICMPv6, SLAAC and DHCPv6, `AAAA` in DNS,
+  IPv6 under UDP, TCP, TLS and QUIC, extension headers (fragmentation from beta-3 carries over).
+* **beta-5: sockets.** The BSD socket API (`socket`, `bind`, `listen`, `accept`, `connect`, `send`/`recv`, non-blocking mode, socket
+  options) over TCP and UDP, IPv4 and IPv6, in the kernel and in the SDK; then `select` and `poll` on top of the wait queues of beta-2.
+  The existing network calls and MiniWeb move onto it.
+* **beta-6: the web grows up.** Cookies and sessions (`Set-Cookie`, `Cookie`, `document.cookie`, the cookie rules that matter: domain,
+  path, `Secure`, `HttpOnly`, `SameSite`, expiry), JSON and XML as an API (`fetch` and `XMLHttpRequest` for scripts, `DOMParser` and XML
+  parsing, a JSON and an XML parser in the SDK for native programs; `JSON.parse` / `JSON.stringify` exist already), and the rest of
+  image decoding (progressive JPEG, animated GIF, WebP, BMP/ICO, SVG).
+* **beta-7: terminal-side networking.** A CLI / TUI browser inside MiniShell (text layout from the same DOM, links, forms, no pictures),
+  and Telnet and SSH clients (SSH needs key exchange, a host-key check, ciphers and a pseudo-terminal; the crypto already in the kernel
+  -- X25519, AES-GCM, SHA-2, ECDSA, RSA -- covers part of it, Ed25519 and ChaCha20-Poly1305 are to be added).
+* **beta-8: memory.** Copy-on-write pages, then swap (a swap file or partition, page-out and page-in from the fault handler, a simple
+  replacement policy).
+* **beta-9: file systems, writing.** FAT12/16/32 and ext2 become writable (alpha-16 only has the read-only readers, by decision), with
+  the same rule as MWFS: a damaged or hostile disk costs files, never memory. NTFS stays read-only.
+* **beta-10: ELF.** An ELF32 loader for static executables and a way to build them (the SDK's toolchain); `.MWP` stays.
+* **beta-11: POSIX compatibility.** A libc subset on the syscall layer: file descriptors, `open`/`read`/`write`/`close`, `fork`
+  (copy-on-write), `exec` (ELF), `wait`, `pipe`, `dup`, signals in a basic form, `errno`, `select`/`poll`, sockets. "Compatible" means
+  that portable programs build and run, not that MiniWin becomes a Unix.
+* **beta-12: SMP.** Starting the other CPUs, local APIC and IPIs, per-CPU data and run queues, locks made safe for several CPUs, TLB
+  shootdowns. Last, because every earlier step is easier to get right on one CPU.
+
+Why this order: the scheduler and the locks come first because blocking sockets, `select`, pipes and `fork` cannot exist without them;
+the TCP and IP work sits before IPv6 and sockets so they are built on the finished stack; copy-on-write must exist before `fork`; ELF
+before POSIX; SMP last. One open question remains: which of the cookies and image items can move earlier, because they do not depend on the kernel work.
 
 The notes below are older and kept for their details.
 

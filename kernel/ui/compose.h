@@ -15,6 +15,7 @@ static void draw_status_line(const char *msg) {
 
 static void render_frame(int mouse_x, int mouse_y, const char *status_msg) {
     disp_tick();                                    /* the "Keep this screen size?" question: the first look at the boot sector, the countdown */
+    oobe_tick();                                    /* the first frame: the first-run setup or the logon prompt, if this system needs one (apps/oobe.h) */
     if (pm_open && pm_help()) status_msg = pm_help();   /* the item under the pointer explains itself in the status line */
     bb_fillrect(0, 0, VGA_WIDTH, VGA_HEIGHT, DESKTOP_COLOR_BG);
 
@@ -61,6 +62,7 @@ static void render_frame(int mouse_x, int mouse_y, const char *status_msg) {
     if (clock_popup_open) draw_date_popup();
     if (pm_open) draw_popup_menu();                  /* the right-click menu is above everything but the pointer */
     if (disp_confirm_open) disp_confirm_draw();
+    if (oobe_open) oobe_draw();                      /* the setup / logon covers the whole screen */
     draw_cursor(mouse_x, mouse_y);
 
     vga_present();

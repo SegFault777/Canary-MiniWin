@@ -101,8 +101,9 @@ static u32 desktop_fg = TH_DESKTOP_TEXT;
 #include "apps/notepad/draw.h"
 #include "ui/cursor.h"   /* the pointer shapes and trails: Settings > Mouse draws them, so it comes before it */
 #include "fontpack.h"        /* the font pack reader: Galmuri11 (and later the other faces) from the system area of the disk */
+#include "ttf.h"             /* the TrueType rasterizer: a .ttf becomes a face */
+#include "fonttf.h"          /* the installed TrueType fonts and the building of their faces (Control Panel > Font > Install New Font) */
 #include "fontface.h"        /* switching the system font face at run time (Control Panel > Font) */
-#include "ttf.h"             /* the TrueType rasterizer: a .ttf becomes a face (the Fonts folder's "Install New Font", not wired up yet) */
 #include "apps/setting.h"
 #include "apps/web/state.h"
 #include "apps/web/address.h"
@@ -112,6 +113,8 @@ static u32 desktop_fg = TH_DESKTOP_TEXT;
 #include "apps/web/view.h"
 #include "apps/terminal.h"
 #include "apps/minifiles.h"
+#include "syscfg.h"            /* /etc/SYSTEM.CFG (language, input methods, desktop colour, time zone, user name) and the user's password */
+#include "apps/oobe.h"          /* the first-run setup and the logon prompt */
 #include "apps/notepad/dialogs.h"
 #include "ui/scroll_targets.h"
 #include "ui/desktop_files.h"

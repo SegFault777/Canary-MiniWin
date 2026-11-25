@@ -23,6 +23,9 @@
 #define LANG_ENGLISH 0
 #define LANG_KOREAN  1
 static int sys_language = LANG_ENGLISH;
+static void syscfg_touch(void);        /* syscfg.h: keeps a changed setting for the next boot (called by Settings) */
+#define SYS_USER_MAX  20
+static char sys_user[SYS_USER_MAX + 1] = "LIVE";   /* who the user is (syscfg.h / apps/oobe.h): LIVE on a live disc or a floppy, the name chosen in the first-run setup otherwise */
 
 #define IME_ENGLISH 0
 #define IME_KOREAN  1

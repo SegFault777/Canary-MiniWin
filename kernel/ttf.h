@@ -345,15 +345,19 @@ static int ttf_render(const ttf_t *t, ttf_work_t *w, u32 g, int ppem, int cell, 
 #define TTF_SYLLABLES 11172
 #define TTF_JAMO      51
 #define TTF_LATIN     95
+/* If set, ttf_make_face() calls it every 256 glyphs with (glyphs done, glyphs in all) -- a progress bar can hang on it. */
+static void (*ttf_progress)(u32 done, u32 total) = 0;
 static u32 ttf_face_rows(int cell, int desc) { return (u32)(TTF_SYLLABLES + TTF_JAMO) * (u32)cell + (u32)TTF_LATIN * (u32)(cell + desc); }
 
 static void ttf_make_face(const ttf_t *t, ttf_work_t *w, int ppem, int cell, int desc, const u16 *fallback, u16 *out, u32 got[3]) {
     u16 *p = out; const u16 *fb = fallback;
     got[0] = got[1] = got[2] = 0;
+    u32 done = 0;
     for (int part = 0; part < 3; part++) {
         u32 base = part == 0 ? 0xAC00u : part == 1 ? 0x3131u : 0x20u, count = part == 0 ? TTF_SYLLABLES : part == 1 ? TTF_JAMO : TTF_LATIN;
         int rows = part == 2 ? cell + desc : cell;
-        for (u32 i = 0; i < count; i++) {
+        for (u32 i = 0; i < count; i++, done++) {
+            if (ttf_progress && (done & 255) == 0) ttf_progress(done, TTF_SYLLABLES + TTF_JAMO + TTF_LATIN);
             u32 g = ttf_gid(t, base + i);
             int has = g != 0 || (part == 2 && i == 0);          /* a space has no glyph of its own but is "there" */
             if (g) ttf_render(t, w, g, ppem, cell, rows, p);
