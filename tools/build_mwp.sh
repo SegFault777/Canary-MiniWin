@@ -54,7 +54,7 @@ echo "[1/3] Compiling $SRC..."
 # know how to run) -- see build.sh's own comment on why -Os over -O1.
 # -ffunction-sections/-fdata-sections + the linker's --gc-sections
 # matter just as much here as for the kernel: PROG_MAX_BYTES is a much
-# tighter budget (24KB) than the kernel's own, so throwing away unused
+# tighter budget (60KB) than the kernel's own, so throwing away unused
 # code is not optional polish, it's how a program fits at all.
 gcc -m32 -ffreestanding -fno-pie -fno-stack-protector -nostdlib -nostdinc \
     -Wall -Wextra -Os -ffunction-sections -fdata-sections \
@@ -77,9 +77,8 @@ ACTUAL_BYTES=$(stat -c%s "$BUILD/$NAME.mwp")
 echo "  $NAME.mwp: $ACTUAL_BYTES / $PROG_MAX_BYTES bytes"
 if [ "$ACTUAL_BYTES" -gt "$PROG_MAX_BYTES" ]; then
     echo "ERROR: $NAME.mwp ($ACTUAL_BYTES bytes) exceeds PROG_MAX_BYTES" \
-         "($PROG_MAX_BYTES bytes, see kernel/fs.h). Either trim the" \
-         "program or grow PROG_MAX_BYTES there (and re-run" \
-         "build.sh, since that changes the disk layout)."
+         "($PROG_MAX_BYTES bytes, see kernel/fs.h). Trim the" \
+         "program: PROG_MAX_BYTES is the loader's whole RAM slot (kernel/memmap.h), it cannot grow past it."
     exit 1
 fi
 

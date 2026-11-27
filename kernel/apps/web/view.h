@@ -281,17 +281,14 @@ static void web_draw_links_pop(void) {
 /* ---------------------------------------------------------------- the About box (MiniWin's own words) */
 #define WEB_ABOUT_W 330
 #define WEB_ABOUT_H 128
-static inline int web_about_x(void) { return web_win.x + (web_win.w - WEB_ABOUT_W) / 2; }
-static inline int web_about_y(void) { return web_win.y + (web_win.h - WEB_ABOUT_H) / 2; }
+static inline int web_about_x(void) { return dlg_ox(DLG_WEB); }        /* the About box is a window of its own now (ui/dialog.h); its contents start at its corner */
+static inline int web_about_y(void) { return dlg_oy(DLG_WEB); }
 static inline int web_about_ok_x(void) { return web_about_x() + (WEB_ABOUT_W - 70) / 2; }
 static inline int web_about_ok_y(void) { return web_about_y() + WEB_ABOUT_H - 30; }
 static int web_about_ok_hit(int mx, int my) { return in_rect(mx, my, web_about_ok_x(), web_about_ok_y(), 70, 22); }
 static void web_draw_about(void) {
     if (!web_about_open) return;
-    int x = web_about_x(), y = web_about_y();
-    bb_fillrect(x, y, WEB_ABOUT_W, WEB_ABOUT_H, TH_FACE); ui_bevel(x, y, WEB_ABOUT_W, WEB_ABOUT_H, 0);
-    bb_fillrect(x + 3, y + 3, WEB_ABOUT_W - 6, 16, TH_ACCENT);
-    ko_draw_mixed_string(x + 8, y + 5, SKO("About MiniWeb", "MiniWeb 정보"), TH_TEXT_INVERSE);
+    int x = web_about_x(), y = web_about_y();                              /* (the frame and the title bar belong to the window: dlg_draw) */
     const u32 *ic = sheet_icon32("WEB"); if (ic) blit_rgba32(x + 14, y + 28, ic);
     ko_draw_mixed_string(x + 56, y + 28, "MiniWeb  (MiniWin 1.1-alpha-14)", TH_TEXT);
     ko_draw_mixed_string(x + 56, y + 43, SKO("HTML5 + JavaScript engine", "HTML5 + 자바스크립트 엔진"), TH_TEXT);
@@ -471,7 +468,6 @@ static void draw_web_window(void) {
     else if (!web_resolving) draw_web_failure();   /* a DNS / connection / TLS failure explains itself */
     web_draw_links_pop();
     mb_draw_drop(WIN_ID_WEB, wx, wy, web_menus, WEB_MENU_N);
-    web_draw_about();
 }
 
 #endif

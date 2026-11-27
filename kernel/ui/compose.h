@@ -14,6 +14,7 @@ static void draw_status_line(const char *msg) {
 }
 
 static void render_frame(int mouse_x, int mouse_y, const char *status_msg) {
+    dlg_poll();                                     /* the questions that were asked or answered since the last frame open or close their windows (ui/dialog.h) */
     disp_tick();                                    /* the "Keep this screen size?" question: the first look at the boot sector, the countdown */
     oobe_tick();                                    /* the first frame: the first-run setup or the logon prompt, if this system needs one (apps/oobe.h) */
     if (pm_open && pm_help()) status_msg = pm_help();   /* the item under the pointer explains itself in the status line */
@@ -46,11 +47,12 @@ static void render_frame(int mouse_x, int mouse_y, const char *status_msg) {
         } else if (PW_IS(id)) {
             pw_select(id);
             draw_prog_window();
+        } else if (DLG_IS(id)) {
+            dlg_draw(id - WIN_ID_DLG, mouse_x, mouse_y);       /* a question: its own window, above its owner */
         } else {
             active_np = &notepads[id];
             draw_window();
             mb_draw_drop(id, active_np->win.x, active_np->win.y, np_menus, NP_MENU_N);
-            if (active_np->confirm_mode != CONFIRM_NONE) draw_confirm_dialog(mouse_x, mouse_y);
         }
     }
 
@@ -61,7 +63,6 @@ static void render_frame(int mouse_x, int mouse_y, const char *status_msg) {
     if (start_menu_open) draw_start_menu(mouse_x, mouse_y);
     if (clock_popup_open) draw_date_popup();
     if (pm_open) draw_popup_menu();                  /* the right-click menu is above everything but the pointer */
-    if (disp_confirm_open) disp_confirm_draw();
     if (oobe_open) oobe_draw();                      /* the setup / logon covers the whole screen */
     draw_cursor(mouse_x, mouse_y);
 

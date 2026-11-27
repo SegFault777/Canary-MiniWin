@@ -21,27 +21,28 @@
 #define TASKBTN_MAXW   124
 #define TASKBTN_MINW   26
 
-static u32 tb_seq[WIN_ID_COUNT];          /* when each window's button first appeared (0 = no button) */
+static u32 tb_seq[WIN_SLOTS];             /* when each window's button first appeared (0 = no button); indexed by win_slot(id) */
 static u32 tb_next = 1;
 
 /* Single source of truth for button layout, shared by draw_taskbar() and every taskbar hit-test below -- computing it twice with two
  * different formulas would be exactly how these things quietly drift out of sync. */
 static void taskbar_layout(int *ids_out, int *count_out, int *pill_w_out) {
     int n = 0;
-    for (int id = 0; id < WIN_ID_COUNT; id++) {
+    for (int s = 0; s < WIN_SLOTS; s++) {                 /* the windows, then the dialogs (a dialog is a window with a button of its own) */
+        int id = win_id_at(s);
         if (win_is_open(id)) {
-            if (tb_seq[id] == 0) tb_seq[id] = tb_next++;
+            if (tb_seq[s] == 0) tb_seq[s] = tb_next++;
             ids_out[n++] = id;
         } else {
-            tb_seq[id] = 0;
+            tb_seq[s] = 0;
         }
     }
-    /* insertion sort by tb_seq ascending -- earliest-opened first. n is at most WIN_ID_COUNT, so this is plenty fast. */
+    /* insertion sort by tb_seq ascending -- earliest-opened first. n is at most WIN_SLOTS, so this is plenty fast. */
     for (int i = 1; i < n; i++) {
         int key = ids_out[i];
-        u32 kseq = tb_seq[key];
+        u32 kseq = tb_seq[win_slot(key)];
         int j = i - 1;
-        while (j >= 0 && tb_seq[ids_out[j]] > kseq) {
+        while (j >= 0 && tb_seq[win_slot(ids_out[j])] > kseq) {
             ids_out[j + 1] = ids_out[j];
             j--;
         }
@@ -72,6 +73,7 @@ static void taskbar_title(int id, char *out, u32 outsz) {
     else if (id == WIN_ID_TERMINAL) s = "MINISHELL.MWP";
     else if (id == WIN_ID_FILES) s = "MINIFILES.MWP";
     else if (PW_IS(id)) { pw_select(id); s = pw_title(); }
+    else if (DLG_IS(id)) s = dlg_title(id - WIN_ID_DLG);
     u32 len = 0;
     out[0] = 0;
     while (*s && len + 1 < outsz) kstrcpy_append(out, &len, outsz, *s++);
@@ -84,6 +86,7 @@ static int taskbar_pill_icon(int id) {
     if (id == WIN_ID_TERMINAL) return IC_TERM;
     if (id == WIN_ID_FILES) return IC_FILES;
     if (PW_IS(id)) { pw_select(id); return pw_icon_id(); }
+    if (DLG_IS(id)) return dlg_icon(id - WIN_ID_DLG);
     return IC_NOTEPAD;
 }
 
@@ -103,7 +106,7 @@ static void draw_taskbar(void) {
     ui_vline(STARTBTN_X + STARTBTN_W + 2, STARTBTN_Y, STARTBTN_H, TH_SHADOW);
     ui_vline(STARTBTN_X + STARTBTN_W + 3, STARTBTN_Y, STARTBTN_H, TH_LIGHT);
 
-    int ids[WIN_ID_COUNT], count, pill_w;
+    int ids[WIN_SLOTS], count, pill_w;
     taskbar_layout(ids, &count, &pill_w);
     int active = taskbar_active_id();
     for (int i = 0; i < count; i++) {
@@ -151,7 +154,7 @@ static int start_button_hit(int px, int py) {
 
 /* The id of the window whose taskbar button contains (px,py), using the exact same layout draw_taskbar() just drew -- or -1. */
 static int taskbar_button_hit(int px, int py) {
-    int ids[WIN_ID_COUNT], count, pill_w;
+    int ids[WIN_SLOTS], count, pill_w;
     taskbar_layout(ids, &count, &pill_w);
     for (int i = 0; i < count; i++) {
         int bx = TASKBTN_X + i * (pill_w + TASKBTN_GAP);

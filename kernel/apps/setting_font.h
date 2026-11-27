@@ -20,7 +20,7 @@
 /* The Add Fonts dialog (setting_addfont.h) is part of this page: its state and entry points are declared here, the code comes after. */
 static int afd_on = 0;                                 /* the dialog is open: it gets the clicks and the keys */
 static void afd_open_dialog(const sheet_t *g);
-static void afd_draw(const sheet_t *g);
+static void afd_draw(void);
 static int afd_click(int mx, int my, u32 now);
 static void afd_release(int mx, int my);
 static int afd_key(int k);
@@ -59,7 +59,7 @@ static int fnt_use_w(void) { return ko_string_width(fnt_use_label()) + 24; }
 static int fnt_kern_x(const sheet_t *g) { return g->X + g->W - 8 - 19 - ko_string_width(SKO("Kerning", "커닝")); }
 #define FNT_ASK_W 262
 #define FNT_ASK_H 84
-static void fnt_ask_geo(const sheet_t *g, int *x, int *y) { *x = g->X + (g->W - FNT_ASK_W) / 2; *y = g->Y + (g->H - FNT_ASK_H) / 2; }
+static void fnt_ask_geo(const sheet_t *g, int *x, int *y) { (void)g; *x = dlg_ox(DLG_FNTASK); *y = dlg_oy(DLG_FNTASK); }      /* the question is a window of its own (ui/dialog.h) */
 static int fnt_can_use(void) { return fontface_count > 1 && !fontface_in_use(fnt_idx()); }
 static const char *fnt_inst_label(void) { return SKO("Install New Font...", "새 글꼴 설치..."); }
 static int fnt_inst_w(void) { return ko_string_width(fnt_inst_label()) + 24; }
@@ -69,13 +69,13 @@ static int fnt_size_x(const sheet_t *g) { return g->X + 8 + fnt_use_w() + 8 + 80
 
 static int fnt_btn_hit(int mx, int my) {
     sheet_t g; fnt_geo(&g);
-    if (!g.ok) return sheet_hint_hit(&g, mx, my);
-    if (fnt_warn >= 0) {
+    if (fnt_warn >= 0) {                                                               /* the question (its own window) answers first, whatever the folder looks like */
         int x, y; fnt_ask_geo(&g, &x, &y);
         if (in_rect(mx, my, x + FNT_ASK_W / 2 - 76, y + FNT_ASK_H - 28, 70, 22)) return 3;
         if (in_rect(mx, my, x + FNT_ASK_W / 2 + 6, y + FNT_ASK_H - 28, 70, 22)) return 4;
         return 0;
     }
+    if (!g.ok) return sheet_hint_hit(&g, mx, my);
     int by = fnt_btn_y(&g);
     if (fnt_can_use() && in_rect(mx, my, g.X + 8, by, fnt_use_w(), 22)) return 1;
     if (fnt_view == 1 && in_rect(mx, my, g.X + 8 + fnt_use_w() + 8, by, 80, 22)) return 2;
@@ -158,16 +158,16 @@ static void fnt_draw(void) {
         }
     }
     ui_pushbutton(g.X + 8, by, fnt_use_w(), 22, fnt_use_label(), fnt_btn_pressed == 1 && fnt_can_use(), fnt_can_use());
-    if (fnt_warn >= 0) {                                                               /* "this font is very small: use it anyway?" */
+    /* (the question "this font is very small: use it anyway?" and the Install New Font dialog are windows of their own: fnt_ask_draw, afd_draw) */
+}
+static void fnt_ask_draw(void) {
+    sheet_t g; fnt_geo(&g);
+    {
         int x, y; fnt_ask_geo(&g, &x, &y);
-        bb_fillrect(x, y, FNT_ASK_W, FNT_ASK_H, TH_FACE); ui_bevel(x, y, FNT_ASK_W, FNT_ASK_H, 0);
-        bb_fillrect(x + 3, y + 3, FNT_ASK_W - 6, FONT_CELL + 4, TH_ACCENT);
-        ko_draw_mixed_string(x + 7, y + 5, SKO("Font", "글꼴"), TH_TEXT_INVERSE);
         ko_draw_mixed_string(x + 10, y + 5 + FONT_LINE_H + 4, SKO("This font is very small. Use it anyway?", "이 글꼴은 매우 작습니다. 그래도 사용할까요?"), TH_TEXT);
         ui_pushbutton(x + FNT_ASK_W / 2 - 76, y + FNT_ASK_H - 28, 70, 22, SKO("Yes", "예"), fnt_btn_pressed == 3, 1);
         ui_pushbutton(x + FNT_ASK_W / 2 + 6, y + FNT_ASK_H - 28, 70, 22, SKO("No", "아니요"), fnt_btn_pressed == 4, 1);
     }
-    if (afd_on && fnt_view == 0) afd_draw(&g);                                         /* Install New Font: the dialog, over the folder */
 }
 
 /* ---- actions ---- */

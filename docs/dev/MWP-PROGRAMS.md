@@ -15,7 +15,7 @@ below, from alpha-3) is unchanged; version 2 appends memory, file, time, mouse, 
 * Raw x86 machine code, compiled freestanding (no libc, no startup files, no relocation) and **linked to run at `0x8F1000`**
   (`MWP_LOAD_ADDR`). The first byte (plus an optional entry offset, normally 0) is the first instruction; it is called with no
   arguments.
-* At most **24,576 bytes** (`PROG_MAX_BYTES`), stored as an ordinary file in `/progs` of the root file system (the
+* At most **61,440 bytes** (`PROG_MAX_BYTES`, the loader's whole slot), stored as an ordinary file in `/progs` of the root file system (the
   entry offset is kept in the file's inode, see [DISK-LAYOUT.md](DISK-LAYOUT.md)); the file itself is pure code and data. Any number
   of programs fit (the desktop and MiniFiles show the first 32). `cp` can copy a program in from a mounted disk.
 * One program runs at a time, and it must return (or loop calling `key_poll`) -- there is no scheduler.
@@ -58,7 +58,7 @@ against the file's length (`kernel/mwp_trailer.h`, tested on damaged files by `t
 the kernel read outside the file. The icons show on the desktop, in the title bar and task bar of the program's window, and in MiniFiles'
 `/progs` list (`kernel/mwp_meta.h`). `build_mwp.sh` takes `NAME.png` beside `NAME.c` as the icon and the comments `/* @mwp title: Name */` and
 `/* @mwp abi: 3 */` for the rest; or pass `--icon`, `--title`, `--abi`. A program can also set its window icon at run time (`sys.set_icon`).
-A program file may now be up to 32 KB (`PROG_MAX_BYTES`) including the trailer.
+A program file may be up to 60 KB (`PROG_MAX_BYTES` = 61,440 = the loader's whole slot, SDK 3.0; it was 32 KB) including the trailer.
 
 ## Running in a window (alpha-11)
 

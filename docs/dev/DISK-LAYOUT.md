@@ -79,7 +79,7 @@ other filesystems and not covered.
 `fs.h` keeps the **slot API** the desktop, Notepad, MiniFiles and the shell were written against, as a thin layer: slot *n* is
 the *n*-th entry of a cache of `/home/docs` (up to `FS_MAX_FILES` = 64) or `/progs` (up to `PROG_MAX_SLOTS` = 32), so a window that
 points at "document 3" keeps working while the bytes live in ordinary files. A document is still at most
-`FS_MAX_FILE_BYTES` = 4096 bytes because that is what Notepad's buffer holds; a program is at most `PROG_MAX_BYTES` = 24576.
+`FS_MAX_FILE_BYTES` = 4096 bytes because that is what Notepad's buffer holds; a program is at most `PROG_MAX_BYTES` = 61440 (the loader's whole slot, `0x8F1000`-`0x8FFFFF`).
 `fs_rescan_docs()` / `fs_rescan_progs()` re-read the directories (boot does, and so do the shell commands that change them).
 
 ## What lives in /etc

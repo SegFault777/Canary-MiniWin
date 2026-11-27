@@ -40,7 +40,7 @@ if [ "$NO_DEMOS" != "1" ]; then
     python3 tools/install_mwp.py "$IMG" 0 GREETER.MWP build/greeter.mwp
 
     # The SDK's example programs (sdk/examples): they show the version-2 API and double as a smoke test of it on every build.
-    for ex in hello:HELLO browse:BROWSE paint:PAINT minicalc:MINICALC crash:CRASHTST ring3:RING3; do
+    for ex in hello:HELLO browse:BROWSE paint:PAINT minicalc:MINICALC tetris:TETRIS mines:MINES crash:CRASHTST ring3:RING3; do
         src="${ex%%:*}"; name="${ex##*:}"
         tools/build_mwp.sh "sdk/examples/$src.c"
         python3 tools/install_mwp.py "$IMG" 0 "$name.MWP" "build/$src.mwp"

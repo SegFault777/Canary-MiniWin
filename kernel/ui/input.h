@@ -45,11 +45,10 @@ static int setting_click_result = 0;         /* what setting_click() said about 
  * follows the cursor without "snapping" its corner to it. One shared
  * mechanism now covers every Notepad window AND Setting, instead of
  * a separate pair of variables per window. */
-static int dragging_id = -1;
-static int drag_offset_x = 0, drag_offset_y = 0;
 
 /* One poll of the mouse: moves the pointer, then dispatches presses, drags and releases to whatever is under it. */
 static void handle_mouse(void) {
+    dlg_poll();                                   /* questions asked or answered since the last pass: their windows open or close (ui/dialog.h) */
     if (mouse_poll()) {
         if (mouse_abs_valid) {                    /* a USB tablet said exactly where the pointer is */
             mx = mouse_abs_x;
@@ -66,7 +65,6 @@ static void handle_mouse(void) {
         int left_now = mouse_left;
         int clicked = mouse_click_event; /* per-packet edge detection from the driver */
         if (oobe_open) { oobe_mouse(mx, my, clicked); return; }                      /* the first-run setup / the logon prompt owns the mouse ... */
-        if (disp_confirm_open) { disp_confirm_mouse(mx, my, clicked); return; }      /* "Keep this screen size?" owns the mouse until it is answered */
 
         /* ---- a scroll bar thumb being dragged (ui/scrollbar.h) ---- */
         if (sb_dragging()) { if (left_now) sb_drag(mx, my); else sb_release(); }
@@ -265,7 +263,7 @@ static void handle_mouse(void) {
                     else if (id == WIN_ID_TERMINAL) status = t(STR_TERMINAL_RESTORED);
                     else if (id == WIN_ID_FILES) status = t(STR_FILES_RESTORED);
                     else if (PW_IS(id)) status = "PROGRAM RESTORED";
-                    else status = t(STR_NOTEPAD_RESTORED);
+                    else if (!DLG_IS(id)) status = t(STR_NOTEPAD_RESTORED);
                 } else if (id == taskbar_active_id()) {
                     win_minimize(id);
                 } else {
@@ -298,13 +296,18 @@ static void handle_mouse(void) {
                     resize_start_h = rw->h;
                 } else if (hit_id >= 0 && (sb_press(hit_id, mx, my) || sb_press(SB_H_BASE + hit_id, mx, my) || (hit_id == WIN_ID_FILES && sb_press(SB_OWNER_FILES_TREE, mx, my)) )) {
                     win_z_raise(hit_id);                       /* a press on a scroll bar: arrow, page jump or the start of a thumb drag */
+                } else if (DLG_IS(hit_id)) {
+                    dlg_click(hit_id, mx, my, tick);                  /* a question's own window (ui/dialog.h): its buttons, its title bar, its contents */
                 } else if (hit_id == WIN_ID_SETTING) {
                     /* Clicking anywhere on a window -- not just a
                      * control that does something -- brings it to
                      * the front, same as any real window manager. */
                     win_z_raise(WIN_ID_SETTING);
                     int mb_m, mb_i;
-                    if (setting_min_hit(mx, my)) {
+                    int sdlg = dlg_blocker(WIN_ID_SETTING);
+                    if (sdlg >= 0) {                                                 /* one of its questions is open (a window of its own): Setting is disabled until it is answered */
+                        dlg_activate(sdlg);
+                    } else if (setting_min_hit(mx, my)) {
                         pressed_btn_kind = BTN_MIN;
                         pressed_btn_win = WIN_ID_SETTING;
                     } else if (setting_max_hit(mx, my)) {
@@ -326,7 +329,9 @@ static void handle_mouse(void) {
                 } else if (hit_id == WIN_ID_WEB) {
                     int mb_m, mb_i;
                     win_z_raise(WIN_ID_WEB);
-                    if (web_min_hit(mx, my)) {
+                    if (web_about_open) {                                           /* the About box is a window of its own: the browser is disabled until it is answered */
+                        dlg_activate(DLG_WEB);
+                    } else if (web_min_hit(mx, my)) {
                         pressed_btn_kind = BTN_MIN;
                         pressed_btn_win = WIN_ID_WEB;
                     } else if (web_max_hit(mx, my)) {
@@ -335,8 +340,6 @@ static void handle_mouse(void) {
                     } else if (web_close_hit(mx, my)) {
                         pressed_btn_kind = BTN_CLOSE;
                         pressed_btn_win = WIN_ID_WEB;
-                    } else if (web_about_open) {                                    /* the About box is modal: only its OK button answers */
-                        if (web_about_ok_hit(mx, my)) { pressed_btn_kind = BTN_WEB_GO; pressed_btn_win = WIN_ID_WEB; web_tb_pressed = 99; }
                     } else if (web_links_item_at(mx, my) >= 0 && web_links_open) {  /* a site of the Links drop-down */
                         web_urlbar_focused = 0;
                         int site = web_links_item_at(mx, my);
@@ -435,19 +438,9 @@ static void handle_mouse(void) {
                     win_z_raise(hit_id);
 
                     if (active_np->confirm_mode != CONFIRM_NONE) {
-                        /* Modal to THIS window only -- other windows
-                         * remain fully interactive; only clicks that
-                         * land inside this one's rect even reach here. */
-                        if (confirm_yes_hit(mx, my)) {
-                            confirm_yes_action();
-                        } else if (confirm_no_hit(mx, my)) {
-                            confirm_no_action();
-                        } else if (confirm_close_hit(mx, my)) {
-                            pressed_btn_kind = BTN_CONFIRM_CLOSE;
-                            pressed_btn_win = hit_id;
-                        } else if (active_np->confirm_mode == CONFIRM_SAVEAS && saveas_field_hit(mx, my)) {
-                            tf_mouse_down(&active_np->saveas_tf, active_np->saveas_name, TF_NAME, mx, keyboard_shift_held());
-                        }
+                        /* Disabled while its question is open (the question is a window of its own, ui/dialog.h): a click here only
+                         * brings the question forward. Other windows remain fully interactive. */
+                        dlg_activate(hit_id);
                     } else if (in_rect(mx, my, btn_min_x(), btn_y(), BTN_W, BTN_H)) {
                         pressed_btn_kind = BTN_MIN;
                         pressed_btn_win = hit_id;
@@ -578,7 +571,9 @@ static void handle_mouse(void) {
             int kind = pressed_btn_kind, win = pressed_btn_win;
             int still_over = 0;
 
-            if (win == WIN_ID_SETTING) {
+            if (DLG_IS(win)) {
+                still_over = dlg_button_still_over(win, kind, mx, my);
+            } else if (win == WIN_ID_SETTING) {
                 if (kind == BTN_MIN) still_over = setting_min_hit(mx, my);
                 else if (kind == BTN_MAX) still_over = setting_max_hit(mx, my);
                 else if (kind == BTN_CLOSE) still_over = setting_close_hit(mx, my);
@@ -605,11 +600,12 @@ static void handle_mouse(void) {
                 if (kind == BTN_MIN) still_over = in_rect(mx, my, btn_min_x(), btn_y(), BTN_W, BTN_H);
                 else if (kind == BTN_MAX) still_over = in_rect(mx, my, btn_max_x(), btn_y(), BTN_W, BTN_H);
                 else if (kind == BTN_CLOSE) still_over = in_rect(mx, my, btn_close_x(), btn_y(), BTN_W, BTN_H);
-                else if (kind == BTN_CONFIRM_CLOSE) still_over = confirm_close_hit(mx, my);
             }
 
             if (still_over) {
-                if (win == WIN_ID_SETTING) {
+                if (DLG_IS(win)) {
+                    dlg_button(win, kind);                          /* _ [] X of a question's window (ui/dialog.h) */
+                } else if (win == WIN_ID_SETTING) {
                     if (kind == BTN_MIN) {
                         win_minimize(WIN_ID_SETTING);
                         status = t(STR_SETTING_MINIMIZED);
@@ -712,8 +708,6 @@ static void handle_mouse(void) {
                         /* Ask before closing, same Yes/No pattern as New. */
                         active_np->confirm_mode = CONFIRM_CLOSE;
                         beep_warning();
-                    } else if (kind == BTN_CONFIRM_CLOSE) {
-                        active_np->confirm_mode = CONFIRM_NONE;
                     }
                 }
             }
@@ -726,6 +720,7 @@ static void handle_mouse(void) {
 
 /* One poll of the keyboard: routes the key to the topmost window (page scrolling, text entry, dialogs, shortcuts). */
 static void handle_keyboard(void) {
+    dlg_poll();                                                    /* (a question that was just asked has its window -- and the keyboard -- before the key is routed) */
     /* ---- keyboard: routed to whichever window is topmost in
      * z-order, if (and only if) that's a Notepad window -- Setting
      * has no text fields, and if the desktop itself is topmost (or
@@ -734,7 +729,6 @@ static void handle_keyboard(void) {
      * the topmost window IS the keyboard focus. ---- */
     int k = keyboard_poll_key();
     if (oobe_open) { oobe_key(k); k = KEY_NONE; }                                                  /* ... and the keyboard */
-    if (disp_confirm_open) { if (k == '\n') disp_keep(); else if (k == 27) disp_revert(); k = 0; }       /* ... and so does the keyboard */
     int focused_id = -1;
     for (int zi = z_count - 1; zi >= 0; zi--) {
         int id = z_order[zi];
@@ -772,7 +766,7 @@ static void handle_keyboard(void) {
 
     /* Settings (the Control Panel): arrows move between the icons, Enter opens one, Esc goes back from a page */
     if (focused_id == WIN_ID_SETTING) {
-        setting_key(k);
+        if (dlg_blocker(WIN_ID_SETTING) < 0) setting_key(k);                   /* (disabled while one of its questions is open) */
         k = KEY_NONE;
     }
 
@@ -789,30 +783,24 @@ static void handle_keyboard(void) {
         k = KEY_NONE;
     }
 
+    /* A question (ui/dialog.h) in front: Notepad's Save changes? / Save As / Help boxes and MiniWeb's About box take the keys */
+    if (DLG_IS(focused_id)) {
+        dlg_key(focused_id, k);
+        k = KEY_NONE;
+    }
+
     /* Terminal scrollback: Up/Down move the view three rows back/forward (consumed here, like the web page above) */
     if (focused_id == WIN_ID_TERMINAL && (k == KEY_UP || k == KEY_DOWN)) {
         term_scroll_by(k == KEY_UP ? 3 : -3);
         k = KEY_NONE;
     }
 
-    if (focused_id >= 0 && focused_id != WIN_ID_SETTING && focused_id != WIN_ID_WEB && focused_id != WIN_ID_TERMINAL && focused_id != WIN_ID_FILES && !PW_IS(focused_id)) {
+    if (focused_id >= 0 && focused_id != WIN_ID_SETTING && focused_id != WIN_ID_WEB && focused_id != WIN_ID_TERMINAL && focused_id != WIN_ID_FILES && !PW_IS(focused_id) && !DLG_IS(focused_id)) {
         active_np = &notepads[focused_id];
 
     if (active_np->confirm_mode != CONFIRM_NONE) {
-        /* keyboard shortcuts for the confirm dialog, so it can be
-         * driven without the mouse too */
-        if (active_np->confirm_mode == CONFIRM_SAVEAS) {
-            /* the Save As dialog is a text field: letters go INTO the name, so Y/N are not shortcuts here */
-            if (k == '\n') { tf_ime_flush(); saveas_do(); }          /* (the Hangul syllable in progress is committed first) */
-            else if (k == 27) { tf_ime_flush(); confirm_no_action(); }   /* Esc */
-            else if (k != KEY_NONE) tf_key(&active_np->saveas_tf, active_np->saveas_name, sizeof active_np->saveas_name, TF_NAME, k, saveas_sync);   /* caret, selection, clipboard, Hangul IME: ui/textfield.h */
-        } else if (active_np->confirm_mode == CONFIRM_INFO) {
-            if (k == '\n' || k == 27 || k == ' ' || k == 'y' || k == 'Y' || k == 'n' || k == 'N') confirm_yes_action();   /* any of these closes the Help dialog */
-        } else if (k == 'y' || k == 'Y') {
-            confirm_yes_action();
-        } else if (k == 'n' || k == 'N') {
-            confirm_no_action();
-        }
+        /* disabled while its question is open (the question is a window of its own, taken care of above): its dialog is minimized, so the keys wait */
+        (void)k;
     } else if (k == KEY_RALT && active_np->win.open && !active_np->win.minimized && mb_owner != active_np->id) {
         /* Right Alt cycles to the next ENABLED input method (see
          * SETTING.MWP > SYSTEM > IME) -- matches the 한/영 key

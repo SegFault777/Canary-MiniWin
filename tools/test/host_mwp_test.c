@@ -11,6 +11,7 @@ typedef unsigned short u16;
 typedef unsigned int   u32;
 #include "../../kernel/mwp_trailer.h"
 #define MWP_ABI_VERSION 4
+#define MW_LIBC_NO_SYS                      /* no syscall table on the host: leave out mw_heap_new and the default heap */
 #include "../../sdk/include/mw_libc.h"
 
 static int checks, failed;

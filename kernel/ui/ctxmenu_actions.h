@@ -356,7 +356,8 @@ static void pm_context_at(int px, int py) {
     if (start_menu_open || clock_popup_open || py >= TASKBAR_Y) return;
     int hit_id; (void)compute_hover_resize_zone(px, py, &hit_id);
     if (hit_id == WIN_ID_FILES) { pm_files_context(px, py); return; }
-    if (hit_id >= 0 && hit_id < NOTEPAD_MAX) { pm_notepad_context(px, py, hit_id); return; }
+    if (hit_id >= 0 && hit_id < NOTEPAD_MAX) { if (notepads[hit_id].confirm_mode == CONFIRM_NONE) pm_notepad_context(px, py, hit_id); return; }       /* (disabled while its question is open) */
+    if (hit_id == WIN_ID_WEB && web_about_open) return;                 /* the About box is open: the browser is disabled */
     if (hit_id == WIN_ID_WEB && web_urlbar_hit(px, py)) { win_z_raise(WIN_ID_WEB); mb_close(); web_urlbar_focused = 1; rd_focus = 0; pm_tf_open(TFT_WEB, px, py); return; }
     if (hit_id == WIN_ID_WEB) { pm_web_context(px, py); return; }
     if (hit_id == WIN_ID_TERMINAL && term_input_hit(px, py)) { win_z_raise(WIN_ID_TERMINAL); mb_close(); term_input_focused = 1; pm_tf_open(TFT_TERM, px, py); return; }

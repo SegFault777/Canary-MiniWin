@@ -153,6 +153,7 @@ For how the pieces fit together see [ARCHITECTURE.md](ARCHITECTURE.md); for the 
 | `kernel/ui/cursor.h` | The mouse pointer: thirteen shapes and the drawing of whichever one cursor_pick() chooses. |
 | `kernel/ui/cursor_ctx.h` | Which pointer shape fits where the pointer is (1.1-alpha-14). |
 | `kernel/ui/desktop_files.h` | The desktop shortcuts for saved documents and installed programs (the cells after the app icons). |
+| `kernel/ui/dialog.h` | Dialogs that are windows (1.1-alpha-14). |
 | `kernel/ui/icon16.h` | The small icons (16x16) every part of the UI shares: folder tree and file lists, window title bars, taskbar pills, the Start menu, dialogs. |
 | `kernel/ui/icons.h` | The desktop icon grid, the 32x32 icon cache, and the five app launcher icons. |
 | `kernel/ui/input.h` | The desktop's input handling: the mouse (clicks, drags, buttons, menus, icons) and the keyboard routing. |
@@ -239,6 +240,7 @@ For how the pieces fit together see [ARCHITECTURE.md](ARCHITECTURE.md); for the 
 | `tools/test/host_quic_test.c` | The REAL kernel/quic.h + h3.h + tls.h (QUIC mode) talking to tools/test/quic_server.py over loopback UDP. Only the layer under QUIC is faked: udp_send()/udp_listen() are backed by a BSD... |
 | `tools/test/host_rd_fuzz.c` | Fuzzer for the HTML engine: random tag soup + random CSS through dom_parse -> rd_layout -> rd_paint, under ASan/UBSan. |
 | `tools/test/host_render.c` | Renders an HTML file through the real engine (dom.h/css.h/layout.h/render.h) into a PPM image: host_render page.html out.ppm [width] [height] The screen is `width` x 480 by default; the... |
+| `tools/test/host_sdk_libc_test.c` | Sdk/include/mw_libc.h (SDK 3.0): the heap (malloc/free/realloc/calloc), rand, strtol, qsort, bsearch, the string helpers. |
 | `tools/test/host_storage_test.c` | Kernel/storage.h against a fake IDE controller with FOUR positions (two channels x master/slave), each holding a disk image, an ATAPI drive, or nothing. |
 | `tools/test/host_textfield_test.c` | Kernel/ui/textfield.h (1.1-alpha-14): the shared one-line text field -- typing, deletion, caret keys with Shift, the clipboard keys, the file-name and password flags, UTF-8 boundaries,... |
 | `tools/test/host_tls13_test.c` | The REAL kernel/tls.h (TLS 1.2 and 1.3) talking to a REAL `openssl s_server` over a loopback socket. |
@@ -271,6 +273,7 @@ For how the pieces fit together see [ARCHITECTURE.md](ARCHITECTURE.md); for the 
 | `tools/test/run_host_mwfs.sh` | Kernel/mwfs.h on a RAM disk: files, directories, a full volume, a randomized run against a model, and a crash sweep. |
 | `tools/test/run_host_mwp.sh` | The .mwp metadata trailer (kernel/mwp_trailer.h, files made by tools/mwp_pack.py) and the SDK's small C library (sdk/include/mw_libc.h) on the host, with the address and... |
 | `tools/test/run_host_quic.sh` | End-to-end QUIC / HTTP/3 test on the build host: kernel/quic.h + h3.h + tls.h (QUIC mode) <-> tools/test/quic_server.py over loopback UDP, no QEMU. Covers: a plain GET (RSA and ECDSA... |
+| `tools/test/run_host_sdk_libc.sh` | Sdk/include/mw_libc.h (the program-side C library: heap, rand, strtol, qsort ...), built 32-bit like a program is, with the sanitizers on. |
 | `tools/test/run_host_storage.sh` | Kernel/storage.h (+ the generalized ata.h) against a fake four-position IDE controller. |
 | `tools/test/run_host_textfield.sh` | Kernel/ui/textfield.h (the shared one-line text field) on the real kernel code, font and screen stubbed. |
 | `tools/test/run_host_tls13.sh` | End-to-end TLS test on the build host: kernel/tls.h <-> `openssl s_server` over loopback, no QEMU. Covers TLS 1.3 (RSA-PSS, ECDSA P-256 and P-384 certificates, AES-128 and AES-256... |

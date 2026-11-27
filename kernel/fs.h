@@ -38,7 +38,7 @@
 #define FS_MAX_FILE_BYTES  4096              /* a document: what Notepad's buffer holds. Bigger files are fine in the filesystem, just not in Notepad */
 #define FS_MAX_FILES       64                /* how many documents the desktop/Notepad/MiniFiles index (more can exist; ls shows all) */
 #define FS_NAME_MAXLEN     MWFS_NAME_MAX
-#define PROG_MAX_BYTES     32768             /* a loadable program file (kernel/mwp.h): code + the optional icon/title trailer (tools/mwp_pack.py); the loader's RAM slot is 60 KB */
+#define PROG_MAX_BYTES     61440             /* a loadable program file (kernel/mwp.h): code + data + the optional icon/title trailer (tools/mwp_pack.py) = the loader's whole RAM slot, 60 KB (SDK 3.0; was 32 KB) */
 #define PROG_MAX_SLOTS     32
 #define PROG_NAME_MAXLEN   24
 

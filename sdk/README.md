@@ -1,6 +1,7 @@
-# MiniWin SDK 2.0
+# MiniWin SDK 3.0
 
-(`sdk/VERSION`; `MW_SDK_VERSION` in `miniwin.h`. The SDK's version is not the ABI's: the ABI is `sys.abi_version`, 3 since 1.1-alpha-11.)
+(`sdk/VERSION`; `MW_SDK_VERSION` in `miniwin.h`. The SDK's version is not the ABI's: the ABI is `sys.abi_version` -- the syscall table is **API v4**, and **ABI v3** is the `int 0x80` calling convention of ring-3 programs.
+**New in SDK 3.0:** programs may be 60 KB (was 32); `mw_libc.h` has a heap (`mw_malloc`/`mw_free`/`mw_realloc`/`mw_calloc`, or your own with `mw_heap_new`), `mw_rand`, `mw_strtol`, `mw_qsort`, `mw_bsearch`; `MW_KEY_UP/DOWN/LEFT/RIGHT`; two bigger examples, `tetris.c` and `mines.c`.)
 
 Everything you need to write a program for MiniWin (a `.MWP` file) lives in this folder and the OS repository around it.
 A program is one C file, compiled freestanding for the 32-bit x86 kernel, linked to run at a fixed address, and copied into
@@ -9,12 +10,14 @@ A program is one C file, compiled freestanding for the 32-bit x86 kernel, linked
 ```
 sdk/
   include/miniwin.h     the header a program includes: the table's address (sys), colours, small inline helpers; pulls in the three below
-  include/mw_libc.h     strings, mw_snprintf, mw_isqrt, mw_muldiv (64-bit intermediate), sine/cosine, sort -- no libc needed
+  include/mw_libc.h     strings, mw_snprintf, mw_strtol, mw_isqrt, mw_muldiv (64-bit intermediate), sine/cosine, mw_rand, mw_qsort/mw_bsearch,
+                        a heap (mw_malloc, mw_free, mw_realloc, mw_calloc) -- no libc needed
   include/mw_gfx.h      lines, circles, gradients, aligned/wrapped text, mw_printf, bitmaps
   include/mw_ui.h       an immediate-mode toolkit: buttons, check boxes, text boxes, lists, progress bars, message boxes, file/clipboard helpers
   include/mwp_abi.h     the syscall table itself -- ONE definition, read by the kernel and by programs alike
   examples/             hello.c (clock, memory, icons), browse.c (folders + files), paint.c (mouse + saving a file),
-                        minicalc.c (calculator: toolkit, clipboard, own icon, set_size, args), crash.c (provokes every fault paging catches)
+                        minicalc.c (calculator: toolkit, clipboard, own icon, set_size, args), tetris.c (a whole game: keyboard, timing, set_size,
+                        a 7-bag), mines.c (Minesweeper: both mouse buttons, mw_calloc, a flood fill, the pop-up menu), crash.c (provokes every fault paging catches)
   build.sh              sdk/build.sh sdk/examples/hello.c            ->  build/hello.mwp
   install.sh            sdk/install.sh sdk/examples/hello.c HELLO.MWP  ->  writes it into build/os-image.img
 
@@ -68,7 +71,7 @@ for (;;) {
 
 1. **No `.bss`.** The loader copies the file and jumps in; it clears nothing. Do not rely on uninitialised globals being zero --
    use locals, or `sys.mem_alloc()` (zero-filled).
-2. **32 KB at most** for the whole file -- code, data and the icon/title trailer (the build checks, and says how close you are).
+2. **60 KB at most** (61,440 bytes: the loader's whole slot) for the whole file -- code, data and the icon/title trailer (the build checks, and says how close you are).
 3. **You own the screen while you run.** The desktop is not redrawn until you return, so draw everything every frame (or keep
    what you drew) and call `sys.present()`. Return from `mwp_entry()` to quit.
 4. **Poll, don't block.** `sys.key_poll()` returns 0 when no key is waiting. Do not `sleep_ms()` for long inside a loop that also

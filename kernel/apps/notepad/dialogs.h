@@ -49,20 +49,11 @@ static void saveas_sync(void) { active_np->saveas_len = (int)tf_len(active_np->s
 static int saveas_field_hit(int px, int py) {
     return in_rect(px, py, confirm_x() + 10, confirm_y() + TITLEBAR_H + 3 + 14, CONFIRM_W - 20, 14);
 }
+/* The contents of Notepad's question window: the frame, the title bar and the _ [] X buttons are drawn by the dialog's window (ui/dialog.h,
+ * dlg_draw); this draws what is inside it, measured from the dialog's own corner (confirm_x/y). */
 static void draw_confirm_dialog(int mx, int my) {
     int x = confirm_x(), y = confirm_y();
-
-    ui_panel(x, y, CONFIRM_W, confirm_h(), TH_WINDOW_SHADOW);
-
-    /* Title bar -- deliberately just an X, no minimize/maximize. This is
-     * a modal warning, not a document window; the only two things you
-     * can do with it are answer it or dismiss it. */
     int info = (active_np->confirm_mode == CONFIRM_INFO);
-    ui_titlebar_ic(x, y, CONFIRM_W, active_np->confirm_mode == CONFIRM_SAVEAS ? "Save As" : (info ? (active_np->info_kind == 1 ? "Keys" : "About") : "Warning!"),
-                   active_np->confirm_mode == CONFIRM_SAVEAS ? IC_DOC : (info ? (active_np->info_kind == 1 ? IC_HELP : IC_NOTEPAD) : IC_WARNING));
-    int clx = confirm_close_x(), cy = confirm_close_y();
-    int p_close = (pressed_btn_kind == BTN_CONFIRM_CLOSE && pressed_btn_win == active_np->id);
-    ui_glyph_close(clx, cy, p_close, 1);
 
     int body_y = y + TITLEBAR_H + 3;
     if (info) {                                                              /* Help > Keys / About: plain lines and an OK button */
@@ -81,9 +72,9 @@ static void draw_confirm_dialog(int mx, int my) {
     else draw_warning_icon(x + 8, body_y);                                 /* ... or the hand-drawn one when the image has no icon pack */
     ko_draw_mixed_string(x + 26, body_y + 1,  t(STR_SAVE_CHANGES), TH_TEXT);
     if (active_np->confirm_mode == CONFIRM_CLOSE) {
-        ko_draw_mixed_string(x + 26, body_y + 11, t(STR_BEFORE_CLOSING), TH_TEXT);
+        ko_draw_mixed_string(x + 26, body_y + 13, t(STR_BEFORE_CLOSING), TH_TEXT);
     } else {
-        ko_draw_mixed_string(x + 26, body_y + 11, t(STR_BEFORE_NEW), TH_TEXT);
+        ko_draw_mixed_string(x + 26, body_y + 13, t(STR_BEFORE_NEW), TH_TEXT);
     }
     }
 

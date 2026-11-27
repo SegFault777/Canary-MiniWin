@@ -87,14 +87,12 @@ static int file_menu_item_hit(int px, int py, int idx) {
 #define CONFIRM_BTN_W 46
 #define CONFIRM_BTN_H 17
 
-static inline int confirm_x(void) { return active_np->win.x + (active_np->win.w - CONFIRM_W) / 2; }
+static inline int confirm_x(void) { return dlg_ox(active_np->id); }                       /* the dialog's own window (ui/dialog.h): where its contents begin */
 static inline int confirm_h(void) { return active_np->confirm_mode == CONFIRM_INFO ? CONFIRM_INFO_H : CONFIRM_H; }
-static inline int confirm_y(void) { return active_np->win.y + (active_np->win.h - confirm_h()) / 2; }
+static inline int confirm_y(void) { return dlg_oy(active_np->id); }
 static inline int confirm_btn_y(void) { return confirm_y() + confirm_h() - CONFIRM_BTN_H - 11; }
 static inline int confirm_yes_x(void) { return active_np->confirm_mode == CONFIRM_INFO ? confirm_x() + (CONFIRM_W - CONFIRM_BTN_W) / 2 : confirm_x() + 22; }
 static inline int confirm_no_x(void)  { return confirm_x() + CONFIRM_W - 22 - CONFIRM_BTN_W; }
-static inline int confirm_close_x(void) { return confirm_x() + CONFIRM_W - 3 - BTN_W; }
-static inline int confirm_close_y(void) { return confirm_y() + 1; }
 
 static int confirm_yes_hit(int px, int py) {
     return in_rect(px, py, confirm_yes_x(), confirm_btn_y(), CONFIRM_BTN_W, CONFIRM_BTN_H);
@@ -102,12 +100,6 @@ static int confirm_yes_hit(int px, int py) {
 static int confirm_no_hit(int px, int py) {
     if (active_np->confirm_mode == CONFIRM_INFO) return 0;          /* the Help dialogs have only OK (drawn where Yes is) */
     return in_rect(px, py, confirm_no_x(), confirm_btn_y(), CONFIRM_BTN_W, CONFIRM_BTN_H);
-}
-/* The title bar's X -- same as clicking neither Yes nor No: bails out
- * of whatever triggered the dialog (New / Close) and leaves the
- * document exactly as it was, untouched and unsaved-but-not-lost. */
-static int confirm_close_hit(int px, int py) {
-    return in_rect(px, py, confirm_close_x(), confirm_close_y(), BTN_W, BTN_H);
 }
 
 #endif

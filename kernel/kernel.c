@@ -116,6 +116,7 @@ static u32 desktop_fg = TH_DESKTOP_TEXT;
 #include "syscfg.h"            /* /etc/SYSTEM.CFG (language, input methods, desktop colour, time zone, user name) and the user's password */
 #include "apps/oobe.h"          /* the first-run setup and the logon prompt */
 #include "apps/notepad/dialogs.h"
+#include "ui/dialog.h"          /* dialogs are windows: Notepad's questions and MiniWeb's About box (needs notepad/dialogs.h, web/view.h) */
 #include "ui/scroll_targets.h"
 #include "ui/desktop_files.h"
 #include "ui/resize.h"

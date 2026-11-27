@@ -89,8 +89,8 @@ static void disp_tick(void) {
 }
 #define DISP_DLG_W 236
 #define DISP_DLG_H 96
-static inline int disp_dlg_x(void) { return (VGA_WIDTH - DISP_DLG_W) / 2; }
-static inline int disp_dlg_y(void) { return (VGA_HEIGHT - TASKBAR_H - DISP_DLG_H) / 2; }
+static inline int disp_dlg_x(void) { return dlg_ox(DLG_DISP); }          /* "Keep this screen size?" is a window of its own now (ui/dialog.h); its contents start at its corner */
+static inline int disp_dlg_y(void) { return dlg_oy(DLG_DISP); }
 static int disp_dlg_btn(int mx, int my) {                                              /* 1 = Yes, 2 = No */
     int x = disp_dlg_x(), y = disp_dlg_y() + DISP_DLG_H - 30;
     if (disp_unavail) return in_rect(mx, my, x + DISP_DLG_W / 2 - 35, y, 70, 22) ? 1 : 0;       /* the notice has one button */
@@ -99,10 +99,7 @@ static int disp_dlg_btn(int mx, int my) {                                       
     return 0;
 }
 static void disp_confirm_draw(void) {
-    int x = disp_dlg_x(), y = disp_dlg_y();
-    bb_fillrect(x, y, DISP_DLG_W, DISP_DLG_H, TH_FACE); ui_bevel(x, y, DISP_DLG_W, DISP_DLG_H, 0);
-    bb_fillrect(x + 3, y + 3, DISP_DLG_W - 6, 15, TH_ACCENT);
-    ko_draw_mixed_string(x + 7, y + 4, SKO("Display Properties", "화면 속성"), TH_TEXT_INVERSE);
+    int x = disp_dlg_x(), y = disp_dlg_y();                                 /* (the frame and the title bar belong to the window: dlg_draw) */
     if (disp_unavail) {
         ko_draw_mixed_string(x + 12, y + 26, SKO("This computer cannot show that size.", "이 컴퓨터는 그 크기를 표시할 수 없습니다."), TH_TEXT);
         ko_draw_mixed_string(x + 12, y + 42, SKO("The screen stays at 640 x 480.", "화면은 640 x 480으로 유지됩니다."), TH_TEXT);
@@ -215,7 +212,7 @@ static void dp_rainbow(int x, int y, int w, int h) {
 
 #define DP_ASK_W 252
 #define DP_ASK_H 86
-static void dp_ask_geo(const sheet_t *g, int *x, int *y) { *x = g->X + (g->W - DP_ASK_W) / 2; *y = g->Y + (g->H - DP_ASK_H) / 2; }
+static void dp_ask_geo(const sheet_t *g, int *x, int *y) { (void)g; *x = dlg_ox(DLG_DPASK); *y = dlg_oy(DLG_DPASK); }      /* the question is a window of its own (ui/dialog.h) */
 
 static void dp_colours(int *bg, int *fg) {
     int i = dp_lb.sel;
@@ -260,11 +257,12 @@ static void dp_draw(void) {
         else ko_draw_mixed_string(l.g1x + 8, l.g1y + 51, disp_depth_name(), TH_SHADOW);
     }
     sheet_footer_draw(&g, dp_btn_pressed, dp_dirty());
-    if (dp_ask) {                                                                       /* the question: restart now? */
+    /* (the question -- restart now? -- is drawn by its own window: dp_ask_draw, called from dlg_draw) */
+}
+static void dp_ask_draw(void) {
+    sheet_t g; dp_geo(&g);
+    {
         int x, y; dp_ask_geo(&g, &x, &y);
-        bb_fillrect(x, y, DP_ASK_W, DP_ASK_H, TH_FACE); ui_bevel(x, y, DP_ASK_W, DP_ASK_H, 0);
-        bb_fillrect(x + 3, y + 3, DP_ASK_W - 6, 15, TH_ACCENT);
-        ko_draw_mixed_string(x + 7, y + 4, SKO("Display Properties", "화면 속성"), TH_TEXT_INVERSE);
         ko_draw_mixed_string(x + 10, y + 24, SKO("The computer must restart to use", "새 크기를 쓰려면 컴퓨터를"), TH_TEXT);
         ko_draw_mixed_string(x + 10, y + 37, SKO("the new screen area. Restart now?", "다시 시작해야 합니다. 지금 시작할까요?"), TH_TEXT);
         ui_pushbutton(x + DP_ASK_W / 2 - 76, y + DP_ASK_H - 28, 70, 22, SKO("Restart", "다시 시작"), dp_btn_pressed == 11, 1);

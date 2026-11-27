@@ -24,7 +24,7 @@ with `memmap.h`, the header wins.
 | `0x810000`-`0x82FFFF` | **storage DMA**: AHCI (`+0x0000`, 8 x 2 KB), SCSI/MPT (`+0x4000`, 2 x 4 KB), NVMe (`+0x6000`, 2 x 24 KB), floppy (`+0x12000`, track buffer + sector) | `MW_STOR_DMA_*` |
 | `0x830000`-`0x86FFFF` | **USB DMA**: four 64 KB slices, one per host controller (xHCI: DCBAA, rings, device contexts, scratchpad pages; EHCI: frame list, QHs, qTDs; OHCI: HCCA, EDs, TDs -- each driver header has its own map) | `MW_USB_DMA_*` |
 | `0x8F0000`-`0x8F0FFF` | the **MWP syscall table** (programs find the kernel's functions here) | `MW_MWP_SYSCALL_ADDR` |
-| `0x8F1000`-`0x8FFFFF` | where a **`.MWP` program** is loaded and run (up to 24 KB used) | `MW_MWP_LOAD_ADDR` |
+| `0x8F1000`-`0x8FFFFF` | where a **`.MWP` program** is loaded and run (up to 60 KB: the whole slot) | `MW_MWP_LOAD_ADDR` |
 | `0x900000`- | the **managed range**: the page allocator's bitmap, then pages handed out by `mm_pages_alloc` and the heap built on them (`kmalloc`); up to the end of RAM, at most 1 GB (`kernel/mm.h`) | `MW_MM_FIRST_ADDR` |
 
 The kernel needs about 9.2 MB of RAM in total (`VGA_MIN_RAM_KB`); `fetch` reports the reserved part (everything below the end of the

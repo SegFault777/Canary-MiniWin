@@ -22,7 +22,7 @@ MiniWeb and MiniFiles; scroll bars you can drag and the mouse wheel, also in Not
 * **Partition editing.** MBR disks only, primary partitions 1-4; GPT, extended and logical partitions can be listed, formatted and
   mounted but not edited.
 * **Disk size.** LBA28: the first 128 GB; an MWFS volume is limited to 2^32 sectors, a root volume written by `os-inst` to 8 GB.
-* **Files.** Documents are limited to 4096 bytes (Notepad's buffer), programs to 24576. File names are 31 characters
+* **Files.** Documents are limited to 4096 bytes (Notepad's buffer), programs to 61440. File names are 31 characters
   (`A-Z a-z 0-9 . _ - ,`); paths 96. No timestamps, permissions or links yet. Directories cannot be moved between volumes, and a
   directory is not removed with its contents (`rm` takes empty ones only). Old disks (alpha-8 and before) are not converted.
 * **Desktop.** Up to 64 documents and 32 programs get an index entry (the desktop, Notepad, MiniFiles); MiniFiles still shows a flat list

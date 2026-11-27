@@ -2,7 +2,7 @@
 #ifndef MW_LIBC_H
 #define MW_LIBC_H
 
-/* mw_libc.h -- the small C library a MiniWin program does not otherwise have (SDK 2.0). Everything is `static inline` or a macro, so
+/* mw_libc.h -- the small C library a MiniWin program does not otherwise have (SDK 3.0: + malloc/free, rand, strtol, qsort, bsearch). Everything is `static inline` or a macro, so
  * only what a program uses ends up in its file (the linker drops the rest), and nothing needs a startup routine or the kernel.
  * No 64-bit division and no floating point (the program is built without libgcc): mw_muldiv() and the fixed-point helpers are the
  * way to do arithmetic that does not fit in 32 bits. */
@@ -118,7 +118,7 @@ static inline int mw_snprintf(char *buf, u32 cap, const char *fmt, ...) {
     return r;
 }
 
-/* ---- sorting: a plain insertion sort (fine for the few dozen items a 24 KB program handles) ---- */
+/* ---- sorting: a plain insertion sort (fine for a few dozen items; mw_qsort below for more) ---- */
 static inline void mw_sort(void *base, u32 count, u32 size, int (*cmp)(const void *, const void *)) {
     u8 *a = (u8 *)base, tmp[64];
     if (size > sizeof tmp) return;
@@ -129,5 +129,167 @@ static inline void mw_sort(void *base, u32 count, u32 size, int (*cmp)(const voi
         mw_memcpy(a + j * size, tmp, size);
     }
 }
+
+/* ---- more strings and memory (SDK 3.0) ---- */
+static inline void *mw_memchr(const void *s, int c, u32 n) { const u8 *p = (const u8 *)s; while (n--) { if (*p == (u8)c) return (void *)p; p++; } return 0; }
+static inline char *mw_strrchr(const char *s, int c) { const char *r = 0; for (;; s++) { if (*s == (char)c) r = s; if (!*s) break; } return (char *)r; }
+/* like C's strtol: optional blanks and sign, base 2..36 (0 = decimal, or 0x.. hex, or 0.. octal); *end (if not 0) is left after the last digit used.
+ * Saturates to INT_MIN / INT_MAX instead of wrapping. */
+static inline int mw_strtol(const char *s, const char **end, int base) {
+    while (mw_isspace(*s)) s++;
+    int neg = 0;
+    if (*s == '-') { neg = 1; s++; } else if (*s == '+') s++;
+    if ((base == 0 || base == 16) && s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) { s += 2; base = 16; }
+    else if (base == 0) base = (s[0] == '0') ? 8 : 10;
+    u32 v = 0; int any = 0, over = 0;
+    for (;; s++) {
+        int d = (*s >= '0' && *s <= '9') ? *s - '0' : (*s >= 'a' && *s <= 'z') ? *s - 'a' + 10 : (*s >= 'A' && *s <= 'Z') ? *s - 'A' + 10 : 99;
+        if (d >= base) break;
+        any = 1;
+        if (v > (0x7FFFFFFFu - (u32)d) / (u32)base) over = 1; else v = v * (u32)base + (u32)d;
+    }
+    if (end) *end = any ? s : 0;
+    if (over) return neg ? (int)0x80000000 : 0x7FFFFFFF;
+    return neg ? -(int)v : (int)v;
+}
+
+/* ---- random numbers: xorshift32. The state starts non-zero ON PURPOSE: a global that is zero would be .bss, which a classic program does not have. ---- */
+static u32 mw_rng_state = 0x9E3779B9u;
+static inline void mw_srand(u32 seed) { mw_rng_state = seed ? seed : 0x9E3779B9u; }
+static inline u32 mw_rand(void) { u32 x = mw_rng_state; x ^= x << 13; x ^= x >> 17; x ^= x << 5; mw_rng_state = x; return x; }
+static inline u32 mw_rand_range(u32 n) { return n ? mw_rand() % n : 0; }          /* 0 .. n-1 */
+
+/* ---- searching and sorting: mw_qsort is a heap sort (n log n, no recursion, no extra memory); mw_sort above stays for tiny lists ---- */
+static inline void mw_swap_bytes(u8 *a, u8 *b, u32 n) { while (n--) { u8 t = *a; *a++ = *b; *b++ = t; } }
+static inline void mw_sift_down(u8 *a, u32 size, u32 i, u32 n, int (*cmp)(const void *, const void *)) {
+    for (;;) {
+        u32 l = 2 * i + 1, big = i;
+        if (l >= n) return;
+        if (cmp(a + l * size, a + big * size) > 0) big = l;
+        if (l + 1 < n && cmp(a + (l + 1) * size, a + big * size) > 0) big = l + 1;
+        if (big == i) return;
+        mw_swap_bytes(a + i * size, a + big * size, size);
+        i = big;
+    }
+}
+static inline void mw_qsort(void *base, u32 count, u32 size, int (*cmp)(const void *, const void *)) {
+    u8 *a = (u8 *)base;
+    if (count < 2 || !size) return;
+    for (u32 i = count / 2; i-- > 0; ) mw_sift_down(a, size, i, count, cmp);
+    for (u32 n = count; n-- > 1; ) { mw_swap_bytes(a, a + n * size, size); mw_sift_down(a, size, 0, n, cmp); }
+}
+static inline void *mw_bsearch(const void *key, const void *base, u32 count, u32 size, int (*cmp)(const void *, const void *)) {
+    u32 lo = 0, hi = count;
+    while (lo < hi) {
+        u32 mid = lo + (hi - lo) / 2;
+        int c = cmp(key, (const u8 *)base + mid * size);
+        if (c == 0) return (void *)((const u8 *)base + mid * size);
+        if (c < 0) hi = mid; else lo = mid + 1;
+    }
+    return 0;
+}
+
+/* ---- a heap of your own: malloc / free / realloc inside ONE block from sys.mem_alloc ----
+ * sys.mem_alloc is the kernel's page-sized allocator: 64 blocks at most per program, and every request costs whole pages. A program that
+ * makes many small objects (a list, a tree, a game's pieces) takes one big block once and carves it up here.
+ *     mw_heap_t *h = mw_heap_new(64 * 1024);        // 0 = out of memory
+ *     char *s = mw_heap_alloc(h, 100);              // 8-byte aligned, NOT zeroed (mw_heap_calloc zeroes); 0 = no room
+ *     s = mw_heap_realloc(h, s, 400);               // keeps the contents (the block may move)
+ *     mw_heap_free(h, s);                           // 1 = freed, 0 = not a live block of this heap (a double free is caught)
+ *     sys.mem_free(h);                              // optional: the kernel frees it when the program returns
+ * The state lives in the heap's own memory, so there is no global (see mw_malloc below for the version that hides the handle).
+ * Blocks next to each other that are freed merge again; the allocator is first-fit. It does not check that a pointer you free really came
+ * from alloc: pass it only what alloc gave you. */
+typedef struct { u32 bytes, magic, used, reserved; } mw_heap_t;           /* 16 bytes at the start of the block; the blocks follow */
+typedef struct { u32 size, prev; } mw_hblk_t;                             /* size: the whole block with this header, a multiple of 8, bit 0 = in use; prev: size of the block before (0 = first) */
+#define MW_HEAP_MAGIC 0x4D574850u
+static inline u8 *mw_heap_first_(mw_heap_t *h) { return (u8 *)h + sizeof(mw_heap_t); }
+static inline u8 *mw_heap_end_(mw_heap_t *h) { return (u8 *)h + sizeof(mw_heap_t) + ((h->bytes - sizeof(mw_heap_t)) & ~7u); }
+static inline mw_heap_t *mw_heap_init(void *mem, u32 bytes) {
+    if (!mem || bytes < sizeof(mw_heap_t) + 32) return 0;
+    mw_heap_t *h = (mw_heap_t *)mem;
+    h->bytes = bytes; h->magic = MW_HEAP_MAGIC; h->used = 0; h->reserved = 0;
+    mw_hblk_t *b = (mw_hblk_t *)mw_heap_first_(h);
+    b->size = (bytes - (u32)sizeof(mw_heap_t)) & ~7u; b->prev = 0;
+    return h;
+}
+#ifndef MW_LIBC_NO_SYS                                                      /* (a host test that includes this header without a syscall table defines MW_LIBC_NO_SYS) */
+static inline mw_heap_t *mw_heap_new(u32 bytes) { return mw_heap_init(sys.mem_alloc(bytes), bytes); }
+#endif
+static inline void *mw_heap_alloc(mw_heap_t *h, u32 n) {
+    if (!h || h->magic != MW_HEAP_MAGIC || n == 0 || n > h->bytes) return 0;
+    u32 need = ((n + 7u) & ~7u) + (u32)sizeof(mw_hblk_t);
+    u8 *p = mw_heap_first_(h), *end = mw_heap_end_(h);
+    while (p < end) {
+        mw_hblk_t *b = (mw_hblk_t *)p;
+        u32 sz = b->size & ~7u;
+        if (sz == 0) return 0;                                            /* damaged: stop rather than loop */
+        if (!(b->size & 1u) && sz >= need) {
+            if (sz - need >= 16) {                                        /* split: the rest stays free */
+                mw_hblk_t *r = (mw_hblk_t *)(p + need);
+                r->size = sz - need; r->prev = need;
+                if (p + sz < end) ((mw_hblk_t *)(p + sz))->prev = sz - need;
+                sz = need;
+            }
+            b->size = sz | 1u;
+            h->used += sz;
+            return p + sizeof(mw_hblk_t);
+        }
+        p += sz;
+    }
+    return 0;
+}
+static inline void *mw_heap_calloc(mw_heap_t *h, u32 count, u32 size) {
+    u32 n = count * size;
+    if (size && n / size != count) return 0;                              /* overflow */
+    void *p = mw_heap_alloc(h, n);
+    if (p) mw_memset(p, 0, n);
+    return p;
+}
+static inline int mw_heap_free(mw_heap_t *h, void *q) {
+    if (!h || h->magic != MW_HEAP_MAGIC || !q) return 0;
+    u8 *first = mw_heap_first_(h), *end = mw_heap_end_(h), *p = (u8 *)q - sizeof(mw_hblk_t);
+    if (p < first || p >= end || ((u32)(p - first) & 7u)) return 0;
+    mw_hblk_t *b = (mw_hblk_t *)p;
+    if (!(b->size & 1u)) return 0;                                        /* already free */
+    u32 sz = b->size & ~7u;
+    h->used -= sz;
+    u8 *nx = p + sz;
+    if (nx < end && !(((mw_hblk_t *)nx)->size & 1u)) { sz += ((mw_hblk_t *)nx)->size & ~7u; nx = p + sz; }      /* merge with the free block after */
+    b->size = sz;
+    if (b->prev) {                                                        /* ... and with the free block before */
+        mw_hblk_t *pb = (mw_hblk_t *)(p - b->prev);
+        if (!(pb->size & 1u)) { pb->size += sz; sz = pb->size; b = pb; }
+    }
+    if (nx < end) ((mw_hblk_t *)nx)->prev = sz;
+    return 1;
+}
+static inline void *mw_heap_realloc(mw_heap_t *h, void *q, u32 n) {
+    if (!q) return mw_heap_alloc(h, n);
+    if (n == 0) { mw_heap_free(h, q); return 0; }
+    mw_hblk_t *b = (mw_hblk_t *)((u8 *)q - sizeof(mw_hblk_t));
+    u32 have = (b->size & ~7u) - (u32)sizeof(mw_hblk_t);
+    if (n <= have) return q;
+    void *r = mw_heap_alloc(h, n);
+    if (!r) return 0;                                                     /* the old block is still yours, as in C */
+    mw_memcpy(r, q, have);
+    mw_heap_free(h, q);
+    return r;
+}
+static inline u32 mw_heap_used(mw_heap_t *h) { return h && h->magic == MW_HEAP_MAGIC ? h->used : 0; }      /* bytes in live blocks (headers included) */
+
+/* The version without a handle: one default heap, made on the first mw_malloc. Define MW_HEAP_BYTES before including miniwin.h to size it
+ * (default 64 KB). The pointer starts as 1 (not 0) because a zero global would be .bss -- see the rules in miniwin.h. */
+#ifndef MW_LIBC_NO_SYS
+#ifndef MW_HEAP_BYTES
+#define MW_HEAP_BYTES 65536
+#endif
+static mw_heap_t *mw_heap_default = (mw_heap_t *)1;
+static inline mw_heap_t *mw_heap_get(void) { if (mw_heap_default == (mw_heap_t *)1) mw_heap_default = mw_heap_new(MW_HEAP_BYTES); return mw_heap_default; }
+static inline void *mw_malloc(u32 n) { return mw_heap_alloc(mw_heap_get(), n); }
+static inline void *mw_calloc(u32 count, u32 size) { return mw_heap_calloc(mw_heap_get(), count, size); }
+static inline void *mw_realloc(void *p, u32 n) { return mw_heap_realloc(mw_heap_get(), p, n); }
+static inline void mw_free(void *p) { mw_heap_free(mw_heap_get(), p); }
+#endif /* MW_LIBC_NO_SYS */
 
 #endif

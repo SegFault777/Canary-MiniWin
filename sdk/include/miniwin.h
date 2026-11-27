@@ -17,12 +17,12 @@
  * anything or set up a heap):
  *   1. No uninitialised globals: there is no .bss. Keep state in locals, or in memory from sys.mem_alloc (zero-filled). (A ring-3 program may
  *      have initialised globals: its data pages are writable.)
- *   2. At most 24 KB of code + data (PROG_MAX_BYTES). `-Os` and the linker's gc-sections are on; avoid big tables.
+ *   2. At most 60 KB of code + data (PROG_MAX_BYTES = 61,440, the loader's whole slot). `-Os` and the linker's gc-sections are on; avoid big tables.
  *   3. Return from mwp_entry() when done -- the kernel takes the screen back and frees any memory you forgot to free.
  */
 #include "mwp_abi.h"
 
-#define MW_SDK_VERSION 2       /* the SDK itself (this header, mw_libc.h, mw_gfx.h, mw_ui.h, the build tools); sdk/VERSION. Not the ABI: that is sys.abi_version */
+#define MW_SDK_VERSION 3       /* the SDK itself (this header, mw_libc.h, mw_gfx.h, mw_ui.h, the build tools); sdk/VERSION. Not the ABI: that is sys.abi_version */
 
 #ifdef MW_RING3                 /* built with --ring3: the program runs in ring 3 and `sys` is a table of int 0x80 stubs in its own memory (mw_abi3.h) */
 #include "mw_abi3.h"
@@ -49,6 +49,14 @@
 #define MW_KEY_ESC   27
 #define MW_KEY_ENTER '\n'
 #define MW_KEY_BACKSPACE '\b'
+/* Keys that are not ASCII come back from key_poll() as small NEGATIVE numbers (the same ones the kernel uses): */
+#define MW_KEY_UP     (-1)
+#define MW_KEY_DOWN   (-2)
+#define MW_KEY_LEFT   (-3)
+#define MW_KEY_RIGHT  (-4)
+#define MW_KEY_HOME   (-7)
+#define MW_KEY_END    (-8)
+#define MW_KEY_DELETE (-9)
 
 #define MW_FONT_W 11                /* every glyph is 11 x 11 pixels; text_width gives the width of a whole string */
 #define MW_FONT_H 11

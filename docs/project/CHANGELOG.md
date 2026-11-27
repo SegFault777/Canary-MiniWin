@@ -2,6 +2,17 @@
 
 ## MiniWin 1.1-alpha-14 (2026-11, in progress)
 
+* **Dialogs are windows** (new `kernel/ui/dialog.h`; `ui/window.h`, `apps/notepad/windows.h`, `ui/taskbar.h`, `ui/resize.h`, `ui/compose.h`, `ui/input.h`,
+  `apps/setting_display.h`, `setting_font.h`, `setting_addfont.h`, `apps/web/view.h` touched; docs/dev/DIALOGS.md): Notepad's "Save changes?", Save As and
+  Keys/About boxes, MiniWeb's About box, and Display Properties' "Keep this screen size?" / restart question, the Fonts folder's "very small font" question and
+  Add Fonts are no longer drawn inside their owner and no longer swallow the mouse. Each is a window of its own: drag it by the title bar, `_ [] X`, its place in
+  the z-order and a button on the task bar. While a question is open its owner is disabled (a click on it brings the question forward; keys go to the
+  question); every other window stays usable. "Keep this screen size?" has no owner and keeps counting down.
+* **SDK 3.0** (`sdk/`, `kernel/fs.h`, `kernel/mwp.h`; test `tools/test/run_host_sdk_libc.sh`): a program may be **60 KB** (`PROG_MAX_BYTES` = the loader's
+  whole slot, was 32 KB; the kernel checks at build time that it never outgrows the slot). `mw_libc.h` gains a **heap** (`mw_malloc`/`mw_free`/`mw_realloc`/
+  `mw_calloc`, or a handle of your own with `mw_heap_new`: one block from `sys.mem_alloc` cut into pieces, first fit, neighbours merge, double free caught),
+  `mw_rand`/`mw_srand`/`mw_rand_range`, `mw_strtol`, `mw_qsort` (heap sort) and `mw_bsearch`, `mw_memchr`, `mw_strrchr`; `miniwin.h` gains `MW_KEY_UP/DOWN/LEFT/RIGHT`.
+  Two bigger examples, **`tetris.c`** and **`mines.c`** (Minesweeper), are installed as TETRIS.MWP and MINES.MWP.
 * **HTTP/3 over QUIC** (new `kernel/quic.h`, `kernel/h3.h`; `kernel/tls.h`, `https.h`, `httpresp.h`, `udp.h`, `memmap.h` and the web app touched;
   tests `tools/test/run_host_quic.sh`, `host_quic_test.c`, `quic_server.py`, `tools/gen_huffman.py`):
   * **The secure connection is the same TLS 1.3 as for HTTPS**, run in a "QUIC mode" (`tls_conn.quic`): its handshake messages travel in QUIC

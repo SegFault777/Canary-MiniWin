@@ -124,10 +124,13 @@ static void afd_set_drive(int k) {
 }
 
 /* ---- geometry ---- */
+/* The dialog is a window of its own (ui/dialog.h): its size depends only on the screen and the font, and its contents start at the window's
+ * corner (dlg_ox/oy). afd_geo() is the layout of everything inside; afd_dims() is what the window is sized by. */
 static int afd_geo(const sheet_t *g, afd_geo_t *o) {
+    (void)g;
     o->rowh = FONT_CELL + 4; o->lh = FONT_LINE_H;
-    int title_h = FONT_CELL + 4;
-    o->dw = 348; if (o->dw > g->W - 4) o->dw = g->W - 4;
+    int title_h = TITLEBAR_H;                                                                 /* (the window's own title bar) */
+    o->dw = 348; if (o->dw > VGA_WIDTH - 4) o->dw = VGA_WIDTH - 4;
     if (o->dw < 300) return 0;
     static const int rows[3][2] = { { 6, 4 }, { 4, 3 }, { 3, 2 } };
     int k;
@@ -135,10 +138,10 @@ static int afd_geo(const sheet_t *g, afd_geo_t *o) {
         o->fr = rows[k][0]; o->dr = rows[k][1];
         o->fl_h = o->fr * o->rowh + 2; o->fd_h = o->dr * o->rowh + 2;
         o->dh = 3 + title_h + 6 + o->lh + o->fl_h + 6 + 2 * o->lh + o->fd_h + 6 + o->lh + 4;
-        if (o->dh <= g->H - 4) break;
+        if (o->dh <= VGA_HEIGHT - TASKBAR_H - 4) break;
     }
     if (k == 3) return 0;
-    o->dx = g->X + (g->W - o->dw) / 2; o->dy = g->Y + (g->H - o->dh) / 2;
+    o->dx = dlg_ox(DLG_ADDFONT); o->dy = dlg_oy(DLG_ADDFONT);
     int y = o->dy + 3 + title_h + 6;
     o->fl_x = o->dx + 8; o->fl_y = y + o->lh; o->fl_w = o->dw - 8 - AFD_BW - 16;
     o->bx = o->dx + o->dw - 8 - AFD_BW; o->by = o->fl_y;
@@ -149,6 +152,7 @@ static int afd_geo(const sheet_t *g, afd_geo_t *o) {
     o->msg_y = o->fd_y + o->fd_h + 6;
     return 1;
 }
+static int afd_dims(int *w, int *h) { afd_geo_t o; if (!afd_geo(0, &o)) return 0; *w = o.dw; *h = o.dh; return 1; }
 static void afd_place(const afd_geo_t *o) {
     afd_lf.x = o->fl_x; afd_lf.y = o->fl_y; afd_lf.w = o->fl_w; afd_lf.h = o->fl_h; afd_lf.row_h = o->rowh; afd_lf.count = afd_nf;
     afd_ld.x = o->fd_x; afd_ld.y = o->fd_y; afd_ld.w = o->fd_w; afd_ld.h = o->fd_h; afd_ld.row_h = o->rowh; afd_ld.count = afd_nd;
@@ -184,13 +188,10 @@ static void afd_fit(const char *s, int maxw, char *out, u32 cap) {
     }
     mwfs_strcpy(out, s, cap);
 }
-static void afd_draw(const sheet_t *g) {
+static void afd_draw(void) {                                                               /* the contents; the frame and the title bar are the window's (dlg_draw) */
     afd_geo_t o;
-    if (!afd_geo(g, &o)) return;
+    if (!afd_geo(0, &o)) return;
     afd_place(&o);
-    bb_fillrect(o.dx, o.dy, o.dw, o.dh, TH_FACE); ui_bevel(o.dx, o.dy, o.dw, o.dh, 0);
-    bb_fillrect(o.dx + 3, o.dy + 3, o.dw - 6, FONT_CELL + 4, TH_ACCENT);
-    ko_draw_mixed_string(o.dx + 7, o.dy + 5, SKO("Add Fonts", "글꼴 추가"), TH_TEXT_INVERSE);
     ko_draw_mixed_string(o.fl_x, o.fl_y - o.lh, SKO("List of fonts:", "글꼴 목록:"), TH_TEXT);
     afd_lf.sel = -1;
     lbx_draw(&afd_lf, afd_row_font);
@@ -279,7 +280,7 @@ static void afd_install(void) {
 /* ---- events ---- */
 static void afd_open_dialog(const sheet_t *g) {
     afd_geo_t o;
-    if (!afd_geo(g, &o)) { fnt_msg = SKO("The window is too small for that.", "창이 너무 작습니다."); return; }
+    if (!afd_geo(g, &o)) { fnt_msg = SKO("The screen is too small for that.", "화면이 너무 작습니다."); return; }
     afd_load_vols();
     if (afd_drive > afd_nv) afd_drive = 0;
     if (!afd_dir[0]) afd_root_path(afd_dir);
@@ -294,9 +295,8 @@ static void afd_fire(int b) {
     else if (b == 5) afd_copy = !afd_copy;
 }
 static int afd_click(int mx, int my, u32 now) {
-    sheet_t g; fnt_geo(&g);
     afd_geo_t o;
-    if (!g.ok || !afd_geo(&g, &o)) { afd_on = 0; return 1; }
+    if (!afd_geo(0, &o)) { afd_on = 0; return 1; }
     afd_place(&o);
     if (afd_drop) {
         int rows = afd_nv + 1, ry = o.dd_y + o.dd_h;
@@ -323,11 +323,10 @@ static int afd_click(int mx, int my, u32 now) {
     return 1;                                                                              /* modal: a click elsewhere does nothing */
 }
 static void afd_release(int mx, int my) {
-    sheet_t g; fnt_geo(&g);
     afd_geo_t o;
     int b = afd_btn;
     afd_btn = 0;
-    if (!b || !g.ok || !afd_geo(&g, &o)) return;
+    if (!b || !afd_geo(0, &o)) return;
     if (afd_hit(&o, mx, my) == b) afd_fire(b);
 }
 static int afd_key(int k) {

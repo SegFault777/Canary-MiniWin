@@ -79,6 +79,7 @@
  * now would just be dead weight. */
 /* (MWP_SYSCALL_TABLE_ADDR itself comes from mwp_abi.h; the assert below proves it equals memmap.h's) */
 typedef char mw_assert_mwp_table_addr[(MWP_SYSCALL_TABLE_ADDR == MW_MWP_SYSCALL_ADDR) ? 1 : -1];
+typedef char mw_assert_prog_fits_slot[(PROG_MAX_BYTES <= MW_MWP_END - MW_MWP_LOAD_ADDR) ? 1 : -1];     /* a program file never outgrows the loader's slot */
 typedef char mw_assert_mwp_addrs[(MWP_LOAD_ADDR == 0x8F1000u && MWP_SYSCALL_TABLE_ADDR == 0x8F0000u) ? 1 : -1];
 
 /* The table's layout lives in sdk/include/mwp_abi.h, shared with the program side -- see the comments there (and the version

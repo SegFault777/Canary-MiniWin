@@ -72,9 +72,33 @@ static notepad_t *active_np = 0;   /* set in kernel_boot once the heap holds the
 #define WIN_ID_PROG     (NOTEPAD_MAX + 4)     /* the FIRST of PW_MAX program windows (apps/progwin.h): WIN_ID_PROG + 0 .. PW_MAX - 1, one per running program */
 #define WIN_ID_COUNT    (NOTEPAD_MAX + 4 + PW_MAX)
 #define PW_IS(id)       ((id) >= WIN_ID_PROG && (id) < WIN_ID_PROG + PW_MAX)
+/* Dialog windows (ui/dialog.h): ids from 32 up, past every scroll-bar owner id (ui/scrollbar.h ignores owners >= SB_MAX_TARGETS = 32), so a dialog
+ * can never be mistaken for a window with a scroll bar. Slot i < NOTEPAD_MAX is the dialog of Notepad window i, slot DLG_WEB is MiniWeb's About box.
+ * Per-window tables (z-order, taskbar order, minimize order) are indexed by win_slot(id): the plain ids first, the dialogs after them. */
+#define WIN_ID_DLG      32
+#define DLG_WEB         NOTEPAD_MAX                 /* MiniWeb's About box */
+#define DLG_DISP        (NOTEPAD_MAX + 1)           /* "Keep this screen size?" (and the "cannot show that size" notice): the system's, no owner window */
+#define DLG_DPASK       (NOTEPAD_MAX + 2)           /* Display Properties: "restart to use the new screen area?" -- owner: Setting */
+#define DLG_FNTASK      (NOTEPAD_MAX + 3)           /* Fonts: "this font is very small, use it anyway?" -- owner: Setting */
+#define DLG_ADDFONT     (NOTEPAD_MAX + 4)           /* Fonts: Install New Font / Add Fonts -- owner: Setting */
+#define DLG_IS(id)      ((id) >= WIN_ID_DLG && (id) < WIN_ID_DLG + DLG_MAX)
+#define WIN_SLOTS       (WIN_ID_COUNT + DLG_MAX)
+_Static_assert(DLG_MAX == NOTEPAD_MAX + 5, "one dialog slot per Notepad window plus the five others above");
+static inline int win_slot(int id)    { return DLG_IS(id) ? WIN_ID_COUNT + (id - WIN_ID_DLG) : id; }
+static inline int win_id_at(int slot) { return slot < WIN_ID_COUNT ? slot : WIN_ID_DLG + (slot - WIN_ID_COUNT); }
+static inline int dlg_owner_id(int slot) {                                                              /* the window a dialog belongs to (and blocks); -1 = none */
+    return slot < NOTEPAD_MAX ? slot : slot == DLG_WEB ? WIN_ID_WEB : slot == DLG_DISP ? -1 : WIN_ID_SETTING;
+}
+/* Where a dialog's own contents begin: the dialog's window, or -- when it is maximized -- the middle of it. The dialogs' drawing and
+ * hit-testing (apps/notepad/dialogs.h, file_menu.h, apps/web/view.h) measure everything from this corner, so they work the same either way. */
+static inline int dlg_ox(int slot) { const window_t *w = &dlg_wins[slot]; return w->x + (w->w - dlg_nat_w[slot]) / 2; }
+static inline int dlg_oy(int slot) { const window_t *w = &dlg_wins[slot]; return w->y + (w->h - dlg_nat_h[slot]) / 2; }
+static const char *dlg_title(int slot);          /* ui/dialog.h */
+static int dlg_icon(int slot);
 static inline void pw_select(int win_id) { pw_sel = win_id - WIN_ID_PROG; }      /* makes `pw` / `pw_win` mean the program window `win_id` */
 
 static int win_is_open(int id) {
+    if (DLG_IS(id)) return dlg_wins[id - WIN_ID_DLG].open;
     if (id == WIN_ID_SETTING) return setting.open;
     if (id == WIN_ID_WEB) return web_win.open;
     if (id == WIN_ID_TERMINAL) return term_win.open;
@@ -83,6 +107,7 @@ static int win_is_open(int id) {
     return notepads[id].win.open;
 }
 static int win_is_minimized(int id) {
+    if (DLG_IS(id)) return dlg_wins[id - WIN_ID_DLG].minimized;
     if (id == WIN_ID_SETTING) return setting.minimized;
     if (id == WIN_ID_WEB) return web_win.minimized;
     if (id == WIN_ID_TERMINAL) return term_win.minimized;
@@ -91,6 +116,7 @@ static int win_is_minimized(int id) {
     return notepads[id].win.minimized;
 }
 static window_t *win_ptr(int id) {
+    if (DLG_IS(id)) return &dlg_wins[id - WIN_ID_DLG];
     if (id == WIN_ID_SETTING) return &setting;
     if (id == WIN_ID_WEB) return &web_win;
     if (id == WIN_ID_TERMINAL) return &term_win;
@@ -105,7 +131,7 @@ static window_t *win_ptr(int id) {
  * entire "clicking a window brings it to the front" feature is just
  * these three tiny functions plus render_frame() drawing in this order
  * and the click-handler hit-testing in reverse. */
-static int z_order[WIN_ID_COUNT];
+static int z_order[WIN_SLOTS];
 static int z_count = 0;
 
 static void win_z_remove(int id) {
@@ -136,6 +162,10 @@ static void win_z_raise(int id) {
     win_z_remove(id);
     z_order[z_count++] = id;
     win_fit_screen(win_ptr(id));
+    if (!DLG_IS(id)) {                                  /* a window with a question open never gets in front of it: the dialog follows its owner up */
+        for (int s = 0; s < DLG_MAX; s++)
+            if (dlg_wins[s].open && dlg_owner_id(s) == id) { win_z_remove(WIN_ID_DLG + s); z_order[z_count++] = WIN_ID_DLG + s; }
+    }
 }
 
 /* ------------------------------------------------------------
@@ -152,11 +182,15 @@ static void win_z_raise(int id) {
 #define BTN_MIN           1
 #define BTN_MAX           2
 #define BTN_CLOSE         3
-#define BTN_CONFIRM_CLOSE 4  /* the Warning dialog's X -- tied to a notepad id like BTN_CLOSE is */
 #define BTN_WEB_GO        5  /* the URL bar's GO button -- always WIN_ID_WEB,
                               * but tracked the same press-hold-release
                               * way as every other button here so a drag-
                               * off cancels it instead of firing early */
+
+/* Window-drag state: which window id is being dragged by its title bar (-1 = none) and the offset from its top-left corner to the point that
+ * was grabbed, so it follows the pointer without its corner snapping to it. One mechanism for every window and every dialog (ui/input.h moves it). */
+static int dragging_id = -1;
+static int drag_offset_x = 0, drag_offset_y = 0;
 
 static int pressed_btn_kind = BTN_NONE;
 static int pressed_btn_win = -1;   /* which window id this press belongs to (WIN_ID_SETTING or a notepad index) */
@@ -169,12 +203,12 @@ static int pressed_btn_win = -1;   /* which window id this press belongs to (WIN
  * that order. A window keeps its z-order slot while minimized (so
  * restoring puts it back where clicking-to-focus would), but it has no
  * on-screen rect to stack while minimized, hence the separate concept. */
-static u32 minimize_seq[WIN_ID_COUNT];
+static u32 minimize_seq[WIN_SLOTS];
 static u32 next_minimize_seq = 1;
 static void win_minimize(int id) {
     window_t *w_ = win_ptr(id);
     w_->minimized = 1;
-    minimize_seq[id] = next_minimize_seq++;
+    minimize_seq[win_slot(id)] = next_minimize_seq++;
 }
 static void win_restore(int id) {
     win_ptr(id)->minimized = 0;

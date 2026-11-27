@@ -21,7 +21,7 @@ No. It runs its own tiny `.MWP` programs, written in C against a small API ([MWP
 
 **How many documents and programs can I keep?**
 As many as the disk has room for: MiniWin has a real file system (directories, files that grow, other disks mounted under `/mnt`; see
-[FILES-AND-DISKS.md](FILES-AND-DISKS.md)). A document is limited to 4 KB because that is what Notepad holds, a program to 24 KB. The
+[FILES-AND-DISKS.md](FILES-AND-DISKS.md)). A document is limited to 4 KB because that is what Notepad holds, a program to 60 KB. The
 desktop shows the first 64 documents and 32 programs.
 
 **Is my data safe if the power goes out while saving?**

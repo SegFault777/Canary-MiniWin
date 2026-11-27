@@ -54,11 +54,12 @@ static int compute_hover_resize_zone(int px, int py, int *out_win_id) {
         int id = z_order[zi];
         if (!win_is_open(id) || win_is_minimized(id)) continue;
         window_t *w = win_ptr(id);
-        int ex = w->x - RESIZE_MARGIN, ey = w->y - RESIZE_MARGIN;
-        int ew = w->w + 2 * RESIZE_MARGIN, eh = w->h + 2 * RESIZE_MARGIN;
+        int m = DLG_IS(id) ? 0 : RESIZE_MARGIN;          /* a dialog has a fixed size: no grab margin around it, nothing to resize */
+        int ex = w->x - m, ey = w->y - m;
+        int ew = w->w + 2 * m, eh = w->h + 2 * m;
         if (!in_rect(px, py, ex, ey, ew, eh)) continue;
         *out_win_id = id;
-        if (w->maximized) return RESIZE_NONE;
+        if (w->maximized || DLG_IS(id)) return RESIZE_NONE;
         return resize_zone_at(px, py, w->x, w->y, w->w, w->h);
     }
     *out_win_id = -1;

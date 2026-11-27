@@ -124,6 +124,15 @@ static window_t pw_wins[PW_MAX] = { PW_WIN0(0), PW_WIN0(1), PW_WIN0(2), PW_WIN0(
 static int pw_sel = 0;                                              /* which program window the pw_* functions and the `pw` / `pw_win` names mean right now (pw_select) */
 #define pw_win (pw_wins[pw_sel])
 
+/* 1.1-alpha-14: dialogs are windows. A question a window asks (Notepad's "Save changes?", Save As and Help boxes; MiniWeb's About box) lives
+ * in a window of its own: it has a title bar you can drag, _ [] X buttons, a place in the z-order and a button on the taskbar, like any other
+ * window -- and its owner is disabled until it is answered (ui/dialog.h). One slot per Notepad window plus one for MiniWeb's About box
+ * (DLG_MAX = NOTEPAD_MAX + 5, checked in apps/notepad/windows.h). dlg_nat_w/h is the size of the dialog's own contents (what it measures when it
+ * is not maximized); the contents stay that size, centred, when the window is maximized. */
+#define DLG_MAX 9
+static window_t dlg_wins[DLG_MAX];
+static int dlg_nat_w[DLG_MAX], dlg_nat_h[DLG_MAX];
+
 /* Forward declarations: MiniShell and MiniFiles (included before apps/progwin.h) start programs in the window. */
 static const char *pw_launch(int slot, const char *name);     /* 0 = started, else a sentence saying why not */
 static const char *pw_launch_args(int slot, const char *name, const char *args);
