@@ -103,7 +103,7 @@ static void kernel_boot(void) {
         const char *const msg[] = { "MiniWin has stopped.", "", "ERROR MW-K02 VBE_PIXEL_FORMAT_UNSUPPORTED",
                                     "the video mode's colour channels are not in the",
                                     "standard red-green-blue order this kernel uses.",
-                                    "", "See docs/dev/BOOT-PROCESS.md." };
+                                    "", "See docs/en/dev/BOOT-PROCESS.md." };
         fatal_screen(msg, 7);
     }
 

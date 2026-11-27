@@ -12,14 +12,16 @@ mode by hand, a from-scratch VGA/mouse/keyboard stack with its own disk
 drivers (IDE, SATA/AHCI, SCSI, NVMe), and a windowing system with no libc, no
 bootloader framework, and no borrowed kernel code.
 
-**Current version: 1.1-alpha-13** ([changelog](docs/project/CHANGELOG.md)). Developed and
+**Current version: 1.1-alpha-14** ([changelog](docs/en/project/CHANGELOG.md)). Developed and
 tested on QEMU; for VMware / VirtualBox see
-[docs/user/VIRTUAL-MACHINES.md](docs/user/VIRTUAL-MACHINES.md).
+[docs/en/user/VIRTUAL-MACHINES.md](docs/en/user/VIRTUAL-MACHINES.md).
 
-**Documentation:** [docs/README.md](docs/README.md) -- guides for people who run MiniWin
-([getting started](docs/user/GETTING-STARTED.md), [troubleshooting](docs/user/TROUBLESHOOTING.md), [FAQ](docs/user/FAQ.md)) and for
-people who change it ([architecture](docs/dev/ARCHITECTURE.md), [source map](docs/dev/SOURCE-MAP.md),
-[contributing](docs/dev/CONTRIBUTING.md)).
+**Other languages:** [한국어 (Korean)](README_ko.md) · documentation in Korean: [docs/ko/README.md](docs/ko/README.md)
+
+**Documentation:** [docs/en/README.md](docs/en/README.md) -- guides for people who run MiniWin
+([getting started](docs/en/user/GETTING-STARTED.md), [troubleshooting](docs/en/user/TROUBLESHOOTING.md), [FAQ](docs/en/user/FAQ.md)) and for
+people who change it ([architecture](docs/en/dev/ARCHITECTURE.md), [source map](docs/en/dev/SOURCE-MAP.md),
+[contributing](docs/en/dev/CONTRIBUTING.md)).
 
 ![Desktop](tools/test/golden/s00_desktop.png)
 
@@ -33,7 +35,7 @@ people who change it ([architecture](docs/dev/ARCHITECTURE.md), [source map](doc
   BIOSes (packet rebuilt per call, nothing kept in registers across the
   call, retry after a disk reset, then smaller reads), and every boot
   error has a code and a name (`MW-B01` ... `MW-K10`, table in
-  `docs/dev/BOOT-PROCESS.md`) instead of a generic message. Split into two stages (`boot/boot.asm`, an
+  `docs/en/dev/BOOT-PROCESS.md`) instead of a generic message. Split into two stages (`boot/boot.asm`, an
   exactly-512-byte MBR, and `boot/stage2.asm`, everything else) once
   finding a real truecolor VBE mode by actually walking the BIOS's own
   mode list -- rather than just requesting a fixed, hoped-for mode
@@ -69,6 +71,9 @@ people who change it ([architecture](docs/dev/ARCHITECTURE.md), [source map](doc
   real overlapping z-order (click a window, it comes to front), edge/
   corner resize handles that swap the cursor to a matching directional
   arrow (horizontal, vertical, or either diagonal) while hovering, a
+  dialogs that are windows too (Notepad's "Save changes?", Save As and Help boxes, MiniWeb's About box, "Keep this screen size?", the Fonts
+  questions and Add Fonts: drag them by the title bar, `_ □ X`, a task bar button each, and their owner window is disabled until they are
+  answered -- [docs/en/dev/DIALOGS.md](docs/en/dev/DIALOGS.md)), a
   Windows-95-style Start Menu with a cascading Shut Down/Restart flyout
   (Restart reboots; Shut Down powers the machine off through ACPI and
   falls back to the classic "safe to turn off" screen where the firmware
@@ -158,6 +163,9 @@ people who change it ([architecture](docs/dev/ARCHITECTURE.md), [source map](doc
   catalog of 64 slots (`kernel/fs.h`'s `ICON_*` constants). The desktop
   icons and MiniFiles draw from it; the rest are installed and waiting
   for the UI to use them.
+- **SDK 3.0** (`sdk/`, [sdk/README.md](sdk/README.md)): everything to write a program for MiniWin outside the kernel tree -- `miniwin.h` (the syscall
+  table, API v4), `mw_libc.h` (strings, `mw_snprintf`, a heap with `mw_malloc`/`mw_free`, `mw_rand`, `mw_qsort`, ...), `mw_gfx.h`, the `mw_ui.h`
+  widget toolkit, a build and an install script, and examples from `hello.c` up to a whole **Tetris** and **Minesweeper** (programs may be 60 KB).
 - **Hangul**: a real IME (2-beolsik-style jamo composition) backed by a
   full modern-Hangul-syllable bitmap font (11,172 glyphs, generated from
   Galmuri11 -- see `tools/gen_hangul_font.py`). English text shares the
@@ -185,8 +193,8 @@ system in a 1.44 MB floppy image, for VMware / VirtualBox "floppy image file").
 Newer versions are published as source only: build with the two commands above. The `build/`
 directory is not tracked in git.
 
-Produces `build/os-image.img`, a raw disk image -- exactly 1MB
-(1,048,576 bytes), a deliberately round size rather than arbitrary
+Produces `build/os-image.img`, a raw disk image -- exactly 1440 KB
+(1,474,560 bytes = 2880 sectors, one 1.44 MB floppy), a deliberately round size rather than arbitrary
 padding. `build.sh` derives the kernel's boot budget and the
 file-storage layout from the same constants `boot/boot.asm` and
 `kernel/fs.h` use (instead of duplicating them as separate magic
@@ -221,7 +229,7 @@ an AHCI SATA disk (`-device ich9-ahci`), a 1.44 MB floppy (`build/os-image-flopp
 controller (`-device mptsas1068`) or an NVMe SSD (`-device nvme`), and the
 kernel finds the disk it came from by itself. For VMware and VirtualBox
 (legacy BIOS, hard disk, supported controllers and NICs, error table) see
-[docs/user/VIRTUAL-MACHINES.md](docs/user/VIRTUAL-MACHINES.md).
+[docs/en/user/VIRTUAL-MACHINES.md](docs/en/user/VIRTUAL-MACHINES.md).
 
 To attach a NIC (for PCI/driver work in progress -- see Roadmap):
 
@@ -312,8 +320,8 @@ tools/install_mwp.py       writes a built .mwp into /progs of an os-image.img
 tools/mwfs.py              formats/fills an MWFS volume inside an image (the offline twin of kernel/mwfs.h)
 tools/install_icons.py     writes the icon bundle into an os-image.img icon catalog
 tools/gen_cursors.py       generates kernel/cursor_data.h (the mouse cursors) from the icon pack
-tools/gen_source_map.py    generates docs/dev/SOURCE-MAP.md (one line per source file)
-docs/                      all documentation, see docs/README.md: user/ (using MiniWin), dev/ (changing it:
+tools/gen_source_map.py    generates docs/en/dev/SOURCE-MAP.md (one line per source file)
+docs/                      all documentation, see docs/en/README.md: user/ (using MiniWin), dev/ (changing it:
                            ARCHITECTURE.md, SOURCE-MAP.md, DRIVERS.md, MEMORY-MAP.md, ...), project/ (changelog, roadmap, licensing)
 docs/logo/                 the MiniWin logo (original + the 6x nearest-neighbour version the README shows)
 tools/test/         host-side tests: run_host_engine.sh (HTML engine + fuzzer), run_host_web.sh (HTTP),
@@ -518,5 +526,5 @@ disk image.
 Bundled third-party material keeps the license of its own authors (the
 Galmuri and Dalmoori fonts, the CA root certificates, and the data files
 generated from them); see `third_party/*/NOTICE.md` and
-[docs/project/LICENSING.md](docs/project/LICENSING.md) for the full picture, including
+[docs/en/project/LICENSING.md](docs/en/project/LICENSING.md) for the full picture, including
 what changed from the earlier MIT-licensed versions.

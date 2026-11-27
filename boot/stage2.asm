@@ -627,7 +627,7 @@ print_string:
     ret
 
 msg_loaded:    db "MiniWin: kernel loaded, entering 32-bit mode...", 13, 10, 0
-; Boot errors have a code and a NAME; the full table (what each means and what to try) is in docs/dev/BOOT-PROCESS.md.
+; Boot errors have a code and a NAME; the full table (what each means and what to try) is in docs/en/dev/BOOT-PROCESS.md.
 ; MW-B01/B02 live in stage 1 (boot.asm), MW-C* in the partition chain loader (chain_mbr.asm).
 msg_err_ram:   db "MiniWin ERROR MW-B06 NOT_ENOUGH_RAM (the kernel is unpacked to 9-10 MB: at least 11 MB of RAM are needed)", 13, 10, 0
 msg_err_khdr:  db "MiniWin ERROR MW-B07 KERNEL_HEADER (the packed kernel on the disk has a bad length)", 13, 10, 0

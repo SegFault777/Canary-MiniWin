@@ -69,7 +69,7 @@ and opens `/mnt/<id>`; **Mount** and **Unmount** do the same without opening it,
 ```
 
 Remarks: `MOUNTED` (an MWFS volume of it is open under `/mnt/<id>`), `RUNNING` (MiniWin is running from there, not installable), `EXTENDED` (a container, pick a logical partition inside it),
-`TOO SMALL` (under 1344 KB).
+`TOO SMALL` (under 1440 KB).
 
 **Install** (the button, or Enter / double-click on a row) does *not* install by itself. It opens MiniShell with `os-inst <id>` already
 typed in; you press Enter, read the summary, and type `YES` ([INSTALLING.md](INSTALLING.md)). A row that cannot be installed on says why

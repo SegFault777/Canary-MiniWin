@@ -202,7 +202,7 @@ For how the pieces fit together see [ARCHITECTURE.md](ARCHITECTURE.md); for the 
 | `tools/gen_huffman.py` | Usage: gen_huffman.py out.inc (needs libnghttp2.so.14 on the machine) Recover the HPACK/QPACK Huffman code table (RFC 7541 App. |
 | `tools/gen_latin_font.py` | Generates kernel/font_latin_data.h: an 11x11 bitmap glyph table for ASCII 0x20-0x7E, extracted from Galmuri11 (third_party/galmuri-font/, SIL OFL 1.1) -- the same font... |
 | `tools/gen_mouse_pics.py` | Turns the three 64x64 mouse pictures of the icon bundle (Images/64x64_other/Mouse.png, Mouse_Left.png, Mouse_Right.png) into kernel/ui/mouse_pics.h, the pictures of Settings > Mouse >... |
-| `tools/gen_source_map.py` | Generates docs/dev/SOURCE-MAP.md: one line per source file (boot loader, kernel headers, programs, tools), taken from the first sentence of the file's own header comment -- so the map... |
+| `tools/gen_source_map.py` | Generates docs/en/dev/SOURCE-MAP.md: one line per source file (boot loader, kernel headers, programs, tools), taken from the first sentence of the file's own header comment -- so the map... |
 | `tools/gen_trusted_roots.py` | Regenerates kernel/trusted_roots.h as a COMPACT anchor table. |
 | `tools/gen_worldmap.py` | Rasterizes Natural Earth's 1:110m land polygons (public domain) into the 1-bit world map the Time Zone tab draws. |
 | `tools/install_all.sh` | One-shot "put everything back after build.sh" -- build.sh rebuilds os-image.img from scratch, which wipes the root filesystem (GREETER.MWP in /progs) and the icon catalog. |
@@ -219,7 +219,7 @@ For how the pieces fit together see [ARCHITECTURE.md](ARCHITECTURE.md); for the 
 | file | what it is |
 |---|---|
 | `tools/test/check_docs.py` | Documentation link check: every relative Markdown link in README.md and docs/**/*.md must point at a file that exists, and every `docs/<path>.md` path mentioned anywhere in the tracked... |
-| `tools/test/check_version.sh` | The version in kernel/version.h must be the one README.md calls current and docs/project/CHANGELOG.md lists first. |
+| `tools/test/check_version.sh` | The version in kernel/version.h must be the one README.md and README_ko.md call current and docs/en/project/CHANGELOG.md lists first. |
 | `tools/test/ecc_tests.h` | The ECC/ECDSA/ECDH half of host_crypto_test.c (pulled in with -DHAVE_ECC_TESTS). |
 | `tools/test/gen_crypto_vectors.py` | Hash lengths straddling the 128-byte block and the 112-byte padding threshold |
 | `tools/test/gen_ecc_consts.py` | Prints the C constants for kernel/ecc.h (NIST P-256 and P-384, from FIPS 186-4 / SEC 2) as little-endian u32 limb arrays, after CHECKING them with plain Python big-int arithmetic: G is... |

@@ -66,7 +66,7 @@ target: ide200  (whole disk)
   QEMU HARDDISK, 16 MB
   starts at sector 0
   it looks empty
-It writes 1344 KB there and erases it.
+It writes 1440 KB there and erases it.
 Type YES to install; else cancels.
 > YES
   installing... do not power off
@@ -94,7 +94,7 @@ Sectors outside the target (the rest of the disk, other partitions) are never to
 ## Safety rules
 
 1. **Vetted target.** The id must resolve to a device that exists, a real (non-extended) partition inside the device,
-   at least 1344 KB (2688 sectors) large.
+   at least 1440 KB (2880 sectors) large.
    `<arch>`, if given, must be `i386`: the only architecture this kernel is (`x86_64`: "not available yet").
 2. **Never the running system.** If any part of the target overlaps the installation MiniWin is running from, it is
    refused. That includes `00` on the disk that holds the running partition, because installing to a whole disk
@@ -168,6 +168,6 @@ is simply called `LIVE`, and everything starts from the defaults every time. `wh
 | `this build has no driver for that storage type yet (only ide, sata, scsi, nvme)` | `usb` |
 | `no such device` / `no such partition on that device` | see `os-inst list` |
 | `that is an extended-partition container ...` | choose a logical partition inside it |
-| `target is smaller than 1344 KB` | too small: an installation needs the 2688 sectors of the stock layout (the file system then takes whatever is left) |
+| `target is smaller than 1440 KB` | too small: an installation needs the 2880 sectors of the stock layout (the file system then takes whatever is left) |
 | `that area is where MiniWin is running from right now` | rule 2 |
 | `INSTALL FAILED ... the target is not bootable now` | a write or the read-back failed; the failing sector is shown |

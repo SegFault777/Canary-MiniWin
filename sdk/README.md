@@ -80,7 +80,7 @@ for (;;) {
    bad instruction stops *your* program in a window and nothing else (`examples/crash.c` provokes each). But a program still runs in ring 0, so
    a wild write into the kernel's data can crash the machine or damage the disk. Check what you pass to the kernel; test in QEMU first.
    **Build with `--ring3` (alpha-14) and none of that is true**: the program runs in ring 3, can touch nothing that is not its own, and a
-   fault stops only it (`examples/ring3.c`; docs/dev/MWP-PROGRAMS.md, "Ring 3"). The source is the same either way.
+   fault stops only it (`examples/ring3.c`; docs/en/dev/MWP-PROGRAMS.md, "Ring 3"). The source is the same either way.
 
 ## Windows (since alpha-11)
 

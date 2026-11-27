@@ -9,10 +9,6 @@ from a virtual machine first.
 That is what it is being prepared for; see [VIRTUAL-MACHINES.md](VIRTUAL-MACHINES.md). Neither has been run by the developer so far -- reports
 with the error name and numbers are very welcome.
 
-**Does it support USB (keyboard, mouse, drives)?**
-Not yet. The keyboard and mouse are the old PS/2 kind, which virtual machines emulate. USB keyboard/mouse support is the next
-hardware goal; USB storage comes after.
-
 **Is it 64-bit?**
 No, it is a 32-bit (i386) system. A 64-bit version is planned for later; there is no 64-bit kernel yet.
 
@@ -29,8 +25,8 @@ A save writes the new version completely before the name is switched over, so af
 document or the complete new one, not a mixture; at worst some unreachable leftovers remain, and `part check <id> fix` gives them
 back. (Tested with simulated power cuts at every sector of every operation.)
 
-**Does it work with a USB keyboard and mouse?**
-Yes: xHCI, EHCI and OHCI controllers are driven, with keyboards, mice (including the wheel) and "USB tablets"; `lsusb` shows what was
+**Does it support USB (keyboard, mouse, drives)?**
+Keyboards, mice and tablets yes (PS/2 too): xHCI, EHCI and OHCI controllers are driven, with keyboards, mice (including the wheel) and "USB tablets"; `lsusb` shows what was
 found. USB hubs, USB sticks/drives and Intel UHCI controllers are not supported yet.
 
 **Can I install it onto a real disk?**

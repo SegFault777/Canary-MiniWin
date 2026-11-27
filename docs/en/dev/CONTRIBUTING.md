@@ -34,14 +34,16 @@ QEMU test scripts at the same time (they share temporary files and the timing-ba
 * One commit per version: title `MiniWin 1.1-alpha-N`, a body that says what changed and why, what was verified (with numbers) and what
   is known not to work or was not run. Author `SegFault777`.
 * The version number lives in **`kernel/version.h`**; `README.md` ("Current version") and the first entry of
-  `docs/project/CHANGELOG.md` must name the same one (`tools/test/check_version.sh` checks). Update the docs a change touches in the
-  same commit -- [docs/README.md](../README.md) says where each kind of fact lives.
+  `docs/en/project/CHANGELOG.md` must name the same one (`tools/test/check_version.sh` checks). Update the docs a change touches in the
+  same commit -- [docs/en/README.md](../README.md) says where each kind of fact lives.
 * The README is re-read against the code at every version: stale sentences about older versions are bugs.
 
 ## Documentation layout
 
-`docs/user/` is for people who run MiniWin, `docs/dev/` for people who change it, `docs/project/` for history, plan and licensing.
-`docs/dev/SOURCE-MAP.md` is generated (`tools/gen_source_map.py`). `tools/test/check_docs.py` fails on a broken link or a mention of a
+`docs/en/user/` is for people who run MiniWin, `docs/en/dev/` for people who change it, `docs/en/project/` for history, plan and licensing.
+`docs/en/` is the original and complete; `docs/ko/` (and `README_ko.md`) are the Korean versions -- when you change an English page that has a Korean twin, change the twin
+in the same commit, and link the English page from the Korean index where a translation does not exist yet.
+`docs/en/dev/SOURCE-MAP.md` is generated (`tools/gen_source_map.py`). `tools/test/check_docs.py` fails on a broken link or a mention of a
 `docs/` path that does not exist.
 
 ## Honest reporting

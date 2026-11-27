@@ -1,8 +1,8 @@
 # Programs (`.MWP`)
 
 A **`.MWP`** ("MiniWin Program") is a small flat binary that the kernel copies to a fixed address and jumps into. This page documents
-the interface **as it is today** (1.1-alpha-11, ABI version 3). The practical guide is [sdk/README.md](../../sdk/README.md); the table is
-defined once, in [sdk/include/mwp_abi.h](../../sdk/include/mwp_abi.h), and read by both the kernel and programs. Version 1 (the table
+the interface **as it is today** (1.1-alpha-11, ABI version 3). The practical guide is [sdk/README.md](../../../sdk/README.md); the table is
+defined once, in [sdk/include/mwp_abi.h](../../../sdk/include/mwp_abi.h), and read by both the kernel and programs. Version 1 (the table
 below, from alpha-3) is unchanged; version 2 appends memory, file, time, mouse, icon and widget functions.
 
 > **Protection depends on how the program was built.** A program built the classic way (ABI 1/2: the table below) runs in ring 0 with
@@ -40,7 +40,7 @@ table of function pointers at the fixed address **`0x8F0000`** (`MWP_SYSCALL_TAB
 Colours are 32-bit `0x00RRGGBB`. The table is read-only for programs and its order is the ABI: **never reorder it**, only append. The
 members above are version 1; version 2 (alpha-10) and version 3 (alpha-11) append memory, files, time, mouse, icons, widgets, the
 clipboard, `args`, `set_size`, `set_icon`, `theme_color`, `beep`, `run_flags` and `set_title` -- see `sdk/include/mwp_abi.h` and the table in
-[sdk/README.md](../../sdk/README.md).
+[sdk/README.md](../../../sdk/README.md).
 
 ## The metadata trailer (alpha-11)
 
@@ -79,7 +79,7 @@ shortcut, in MiniFiles and in MiniShell's `apps`, and starts with a double-click
 
 ## Writing one
 
-Start from the SDK ([sdk/README.md](../../sdk/README.md): `miniwin.h`, a small C library, drawing helpers and a UI toolkit, five examples including a
+Start from the SDK ([sdk/README.md](../../../sdk/README.md): `miniwin.h`, a small C library, drawing helpers and a UI toolkit, five examples including a
 calculator), or from `programs/greeter.c`. Keep to what a freestanding program can do: no libc (the SDK's `mw_libc.h` has the common pieces,
 including `mw_snprintf`), no global constructors, no floating point and no 64-bit division (no libgcc); the stack is 128 KB when it runs in a window. Linker script: `kernel/mwp_link.ld` (the load address is kept in three places that must agree --
 `memmap.h`, the linker script and `mwp_api.h`; `mwp.h` asserts the first).
@@ -88,9 +88,9 @@ including `mw_snprintf`), no global constructors, no floating point and no 64-bi
 
 `tools/build_mwp.sh prog.c --ring3` (or a comment line `/* @mwp ring3 */` in the source) builds a program for ring 3: the file is marked
 `MWP_FLAG_RING3` (trailer flag 8, minimum ABI 4) and compiled with `-DMW_RING3`, which makes `miniwin.h` include
-[`mw_abi3.h`](../../sdk/include/mw_abi3.h). **The source does not change**: `sys.fill_rect(...)` is still `sys.fill_rect(...)`, but `sys` is now
+[`mw_abi3.h`](../../../sdk/include/mw_abi3.h). **The source does not change**: `sys.fill_rect(...)` is still `sys.fill_rect(...)`, but `sys` is now
 a table in the program's own memory whose entries are tiny stubs that execute `int 0x80` (eax = a `MW_SYS_*` number, ebx ecx edx esi edi =
-arguments, the result in eax; a call with six arguments passes a pointer to an int array). The kernel side is [kernel/ring3.h](../../kernel/ring3.h).
+arguments, the result in eax; a call with six arguments passes a pointer to an int array). The kernel side is [kernel/ring3.h](../../../kernel/ring3.h).
 
 What the CPU then enforces, and `examples/ring3.c` lets you try (keys 1-7):
 - a read or write of anything that is not the program's own pages -- the kernel's code or data, the syscall table page (0x8F0000), the null

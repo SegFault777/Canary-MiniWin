@@ -3,11 +3,17 @@
 ## MiniWin 1.1-alpha-14 (2026-11, in progress)
 
 * **Dialogs are windows** (new `kernel/ui/dialog.h`; `ui/window.h`, `apps/notepad/windows.h`, `ui/taskbar.h`, `ui/resize.h`, `ui/compose.h`, `ui/input.h`,
-  `apps/setting_display.h`, `setting_font.h`, `setting_addfont.h`, `apps/web/view.h` touched; docs/dev/DIALOGS.md): Notepad's "Save changes?", Save As and
+  `apps/setting_display.h`, `setting_font.h`, `setting_addfont.h`, `apps/web/view.h` touched; docs/en/dev/DIALOGS.md): Notepad's "Save changes?", Save As and
   Keys/About boxes, MiniWeb's About box, and Display Properties' "Keep this screen size?" / restart question, the Fonts folder's "very small font" question and
   Add Fonts are no longer drawn inside their owner and no longer swallow the mouse. Each is a window of its own: drag it by the title bar, `_ [] X`, its place in
   the z-order and a button on the task bar. While a question is open its owner is disabled (a click on it brings the question forward; keys go to the
   question); every other window stays usable. "Keep this screen size?" has no owner and keeps counting down.
+* **Documentation in two languages**: the English docs moved from `docs/{dev,project,user}` to `docs/en/{dev,project,user}` (the docs index is now
+  `docs/en/README.md`; `docs/logo/` stays); the Korean ones live in `docs/ko/` (index, getting started and FAQ so far; the rest link to the English page) and in
+  the new `README_ko.md`, the Korean counterpart of `README.md`, which stays English. `tools/test/check_docs.py` also checks `README_ko.md`,
+  `tools/test/check_version.sh` also wants its `현재 버전:` line, and `tools/gen_source_map.py` writes `docs/en/dev/SOURCE-MAP.md`.
+* **The stock image is 1440 KB** (2880 sectors, was 1344 KB / 2688): the root volume grew from 315 to 507 sectors (`MW_ROOTFS_STOCK_SECTORS`, `ST_INSTALL_SECTORS`), because
+  the licence texts and the SDK examples had filled it; it is still exactly one 1.44 MB floppy. An installation target now needs 1440 KB.
 * **SDK 3.0** (`sdk/`, `kernel/fs.h`, `kernel/mwp.h`; test `tools/test/run_host_sdk_libc.sh`): a program may be **60 KB** (`PROG_MAX_BYTES` = the loader's
   whole slot, was 32 KB; the kernel checks at build time that it never outgrows the slot). `mw_libc.h` gains a **heap** (`mw_malloc`/`mw_free`/`mw_realloc`/
   `mw_calloc`, or a handle of your own with `mw_heap_new`: one block from `sys.mem_alloc` cut into pieces, first fit, neighbours merge, double free caught),
@@ -296,8 +302,8 @@ management and kernel modernisation, the SDK and a richer MWP API, icons in more
 * **Version in one place** (`kernel/version.h`): the desktop hint said "1.1-ALPHA-1" for six releases; it, `ver` and `fetch` now
   follow `MW_VERSION`, and `tools/test/check_version.sh` compares it with the README and this file.
 * **Logo license**: CC BY-SA 4.0 (`docs/logo/LICENSE`, LICENSING.md).
-* **Documentation reorganised** into `docs/user/` (for people who run MiniWin), `docs/dev/` (for people who change it) and
-  `docs/project/` (changelog, roadmap, licensing), with an index in `docs/README.md`. New user pages: getting started, desktop and
+* **Documentation reorganised** into `docs/en/user/` (for people who run MiniWin), `docs/en/dev/` (for people who change it) and
+  `docs/en/project/` (changelog, roadmap, licensing), with an index in `docs/en/README.md`. New user pages: getting started, desktop and
   apps, Terminal commands (with `fetch` explained), files and disks, troubleshooting (every start-up error in plain words), FAQ.
   New developer pages: contributing, drivers overview, adding a driver, memory map, `.MWP` programs, UI framework, and a
   **generated source map** (`tools/gen_source_map.py`: one line per file from its own header comment). `tools/test/check_docs.py`

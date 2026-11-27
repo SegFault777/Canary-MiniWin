@@ -7,7 +7,7 @@
  * validation is that NOTHING in the trailer can make the kernel read outside the file. Needs only u8/u16/u32. */
 
 /* The optional metadata trailer tools/mwp_pack.py appends to a .mwp (icon, title, minimum ABI; layout in that file's header and in
- * docs/dev/MWP-PROGRAMS.md). Parses and VALIDATES it against the file's own length: every offset must lie between the end of the program
+ * docs/en/dev/MWP-PROGRAMS.md). Parses and VALIDATES it against the file's own length: every offset must lie between the end of the program
  * and the trailer, so a damaged or hostile trailer can never make the kernel read outside the file. Returns 1 with *out filled in, 0 if
  * the file has no (valid) trailer -- which is every program built before alpha-11, and they run exactly as before. */
 typedef struct { u32 payload_len, icon16_off, icon32_off, title_off, min_abi; u16 flags; } mwp_trailer_t;

@@ -3,7 +3,7 @@
 ## The project: GPL-3.0-only
 
 From **MiniWin 1.1-alpha-1** the project is licensed under the **GNU General Public License, version 3**
-(SPDX identifier `GPL-3.0-only`). The complete text is in [`LICENSE`](../../LICENSE). Every hand-written source file
+(SPDX identifier `GPL-3.0-only`). The complete text is in [`LICENSE`](../../../LICENSE). Every hand-written source file
 (`kernel/`, `boot/`, `tools/`, `build.sh`, the test programs) starts with the line
 
     SPDX-License-Identifier: GPL-3.0-only

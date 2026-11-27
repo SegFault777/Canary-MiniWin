@@ -16,7 +16,7 @@
  * Notepad's windows, the desktop icons and MiniFiles' rows keep pointing at "document 3" the way they always did, while the
  * bytes live in ordinary files you can also reach with ls/cat/cp/mv in MiniShell.
  *
- * Disk layout (LBA = sector, 512 bytes; the install image is exactly 1344 KB = 2688 sectors):
+ * Disk layout (LBA = sector, 512 bytes; the install image is exactly 1440 KB = 2880 sectors, one 1.44 MB floppy):
  *   LBA 0        boot sector (stage 1, boot/boot.asm)
  *   LBA 1-4      stage 2 (boot/stage2.asm: kernel loading, VBE mode search, A20, GDT, the jump to protected mode)
  *   LBA 5-1028   the kernel (512 KB budget; boot/stage2.asm's KERNEL_CHUNKS is the loader's side of this number)
@@ -26,14 +26,14 @@
  *                Galmuri11 first (the default; the kernel no longer carries it), then, on the full image, Galmuri7 / 9 / 14 and
  *                Galmuri11 Bold. Format and tools: tools/gen_font_pack.py; reader: kernel/fontpack.h. The floppy image and a plain
  *                build have only Galmuri11 in it (the rest of the region is zero). Being in the system area, os-inst copies it.
- *   LBA 2373-2687 the ROOT VOLUME, "/": an MWFS of 315 sectors in the stock image, holding the directory tree of vfs.h (/home/docs, /progs, /etc, ...).
+ *   LBA 2373-2879 the ROOT VOLUME, "/": an MWFS of 507 sectors in the stock image, holding the directory tree of vfs.h (/home/docs, /progs, /etc, ...).
  *                os-inst gives an installation on a bigger partition a root volume that fills the rest of the partition.
- * Every sector from LBA 1 to LBA 2687 is spoken for; build.sh checks that the kernel budget, the catalog and the root
+ * Every sector from LBA 1 to LBA 2879 is spoken for; build.sh checks that the kernel budget, the catalog and the root
  * volume really do follow one another with no overlap. */
 #define MW_FONT_LBA            1733u         /* the font pack (tools/gen_font_pack.py); relative to the installation's first sector */
 #define MW_FONT_SECTORS         640u
 #define MW_ROOTFS_LBA          2373u         /* relative to the installation's first sector */
-#define MW_ROOTFS_STOCK_SECTORS 315u         /* what the stock 1344 KB image has left after the font pack */
+#define MW_ROOTFS_STOCK_SECTORS 507u         /* what the stock 1440 KB image has left after the font pack (1.1-alpha-14: was 315 in a 1344 KB image, which the SDK examples filled) */
 
 #define FS_MAX_FILE_BYTES  4096              /* a document: what Notepad's buffer holds. Bigger files are fine in the filesystem, just not in Notepad */
 #define FS_MAX_FILES       64                /* how many documents the desktop/Notepad/MiniFiles index (more can exist; ls shows all) */

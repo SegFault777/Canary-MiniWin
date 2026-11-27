@@ -53,7 +53,7 @@ static inline int st_type_has_driver(st_type_t t) { return t == ST_IDE || t == S
 #define ST_E_READ_ONLY    10   /* an optical disc: nothing can be written to it */
 
 /* The size of one complete MiniWin installation (the fixed disk layout of fs.h: LBA 0..2047). */
-#define ST_INSTALL_SECTORS 2688      /* MW_ROOTFS_LBA + MW_ROOTFS_STOCK_SECTORS (kernel/fs.h); build.sh checks they agree */
+#define ST_INSTALL_SECTORS 2880      /* MW_ROOTFS_LBA + MW_ROOTFS_STOCK_SECTORS (kernel/fs.h); build.sh checks they agree */
 
 /* ================================================================ partitions */
 typedef struct {
@@ -282,7 +282,7 @@ static inline int st_resolve(const char *s, st_target_t *t) {
         if (t->base >= dev_sectors || t->sectors > dev_sectors - t->base) return ST_E_RANGE;
     }
     if (t->sectors < ST_INSTALL_SECTORS) return ST_E_TOO_SMALL;
-    /* The WHOLE target region, not just the 2688 sectors an install will write, is compared with the running
+    /* The WHOLE target region, not just the 2880 sectors an install will write, is compared with the running
      * installation's footprint: installing to a whole device ("00") rewrites sector 0 and with it the partition table,
      * which would orphan a MiniWin that is running from a partition inside that very device. */
     if (t->pos == blk_boot_dev && st_overlap(t->base, t->sectors, blk_boot_base, ST_INSTALL_SECTORS)) return ST_E_OVERLAP_BOOT;
@@ -297,7 +297,7 @@ static inline const char *st_error_text(int e) {
         case ST_E_NO_DEVICE:    return "no such device (see os-inst list)";
         case ST_E_NO_PARTITION: return "no such partition on that device (see os-inst list)";
         case ST_E_EXTENDED:     return "that is an extended-partition container; pick a logical partition inside it";
-        case ST_E_TOO_SMALL:    return "target is smaller than 1344 KB (2688 sectors), too small for MiniWin";
+        case ST_E_TOO_SMALL:    return "target is smaller than 1440 KB (2880 sectors), too small for MiniWin";
         case ST_E_OVERLAP_BOOT: return "that area is where MiniWin is running from right now";
         case ST_E_RANGE:        return "the partition table points outside the device";
         case ST_E_READ_ONLY:    return "that is a CD/DVD: read-only, MiniWin cannot be installed on it";

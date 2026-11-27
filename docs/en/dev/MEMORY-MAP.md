@@ -37,7 +37,7 @@ last fixed region) against the RAM the BIOS reports (`INT 15h` `E801h`, saved at
 * **DMA buffers.** Devices read and write physical addresses; with no paging a pointer *is* the bus address, so the DMA regions are
   just named slices of RAM below 4 GB (below 16 MB for the floppy's ISA DMA, and never across a 64 KB boundary).
 * **Big tables ride compressed.** The image has a hard 512 KB budget (the boot loader reads exactly 1024 sectors), so the Korean font
-  is LZ4-compressed in the image and inflated into the region above ([lz.h](../../kernel/lz.h)).
+  is LZ4-compressed in the image and inflated into the region above ([lz.h](../../../kernel/lz.h)).
 
 ## Changing the map
 

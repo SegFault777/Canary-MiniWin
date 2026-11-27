@@ -227,7 +227,7 @@ cat $BUILD/kernel.packed >> $BUILD/os-image.img
 # the matching numbers. The check below still fails loudly if the real
 # minimum ever grows past whichever round number is targeted, instead of
 # silently truncating something.
-TARGET_TOTAL_BYTES=$((MIN_IMAGE_SECTORS * 512))        # (1.1-alpha-14: the image is as big as its layout: 2688 sectors = 1344 KB)
+TARGET_TOTAL_BYTES=$((MIN_IMAGE_SECTORS * 512))        # (1.1-alpha-14: the image is as big as its layout: 2880 sectors = 1440 KB)
 TARGET_TOTAL_SECTORS=$((TARGET_TOTAL_BYTES / 512))
 if [ "$MIN_IMAGE_SECTORS" -ne "$TARGET_TOTAL_SECTORS" ]; then
     echo "ERROR: the kernel + file-slot layout now needs" \

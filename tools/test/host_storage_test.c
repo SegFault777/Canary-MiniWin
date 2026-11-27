@@ -213,7 +213,7 @@ static void test_install(void) {
 
     /* ---- 2. partition of a blank-MBR disk: chain loader added, partition marked active ---- */
     reset_all(); add_disk(0, 4096, "RUNNING"); add_disk(2, 16384, "TARGET"); fill_source(0, 0, 0); sentinel(2);
-    { u8 *m = sec(2, 0); memset(m, 0, 512); mbr_entry(m, 0, 0x80, 0x83, 2816, 4096); mbr_entry(m, 1, 0x00, 0x83, 8192, 4096); sign(m); }
+    { u8 *m = sec(2, 0); memset(m, 0, 512); mbr_entry(m, 0, 0x80, 0x83, 2944, 4096); mbr_entry(m, 1, 0x00, 0x83, 8192, 4096); sign(m); }
     inst_id_override = 0x0BADBEEF;
     CHECK(st_resolve("ide302", &t) == ST_OK && t.base == 8192, "resolve partition 2 (base %u)", t.base);
     { u8 before[512]; memcpy(before, sec(2, 0), 512);
@@ -226,11 +226,11 @@ static void test_install(void) {
       CHECK(m[446] == 0x00 && m[446 + 16] == 0x80, "partition 2 is now the active one, partition 1 no longer is");
       CHECK(memcmp(m + 446 + 1, before + 446 + 1, 15) == 0 && memcmp(m + 446 + 16 + 1, before + 446 + 16 + 1, 15) == 0, "the rest of the partition table is unchanged");
       CHECK(m[510] == 0x55 && m[511] == 0xAA, "the 0xAA55 signature is still there");
-      CHECK(all_sentinel(2, 1, 2816) && all_sentinel(2, 8192 + ST_INSTALL_SECTORS, 16384), "nothing outside the target partition (and the MBR) was touched"); }
+      CHECK(all_sentinel(2, 1, 2944) && all_sentinel(2, 8192 + ST_INSTALL_SECTORS, 16384), "nothing outside the target partition (and the MBR) was touched"); }
 
     /* ---- 3. partition of a disk that already has boot code: hands off ---- */
     reset_all(); add_disk(0, 4096, "RUNNING"); add_disk(2, 16384, "TARGET"); fill_source(0, 0, 0); sentinel(2);
-    { u8 *m = sec(2, 0); memset(m, 0, 512); m[0] = 0xEB; m[1] = 0x5A; memcpy(m + 3, "GRUB LOADER", 11); mbr_entry(m, 0, 0x80, 0x83, 2816, 4096); mbr_entry(m, 1, 0, 0x83, 8192, 4096); sign(m); }
+    { u8 *m = sec(2, 0); memset(m, 0, 512); m[0] = 0xEB; m[1] = 0x5A; memcpy(m + 3, "GRUB LOADER", 11); mbr_entry(m, 0, 0x80, 0x83, 2944, 4096); mbr_entry(m, 1, 0, 0x83, 8192, 4096); sign(m); }
     { u8 before[512]; memcpy(before, sec(2, 0), 512);
       st_resolve("ide302", &t); inst_begin(&t, 0);
       CHECK(run_job() == INST_PHASE_DONE && inst.mbr_result == INST_MBR_KEPT, "existing boot code: install done, MBR left alone (result %d)", inst.mbr_result);
@@ -262,7 +262,7 @@ static void test_install(void) {
     long cuts[] = { 0, 1, 100, 1500, 2371, 2373, 2400, full_writes - 2, full_writes - 1 };
     for (unsigned c = 0; c < sizeof cuts / sizeof cuts[0]; c++) {
         reset_all(); add_disk(0, 4096, "RUNNING"); add_disk(2, 8192, "TARGET"); fill_source(0, 0, 0); sentinel(2);
-        u8 *m = sec(2, 0); memset(m, 0, 512); mbr_entry(m, 0, 0x80, 0x83, 2816, 4096); sign(m);   /* the disk's existing table */
+        u8 *m = sec(2, 0); memset(m, 0, 512); mbr_entry(m, 0, 0x80, 0x83, 2944, 4096); sign(m);   /* the disk's existing table */
         u8 before[512]; memcpy(before, m, 512);
         st_resolve("ide300", &t); inj_write_fail_dev = 2; inj_write_fail_after = cuts[c];
         inst_begin(&t, 0);
@@ -282,7 +282,7 @@ static void test_install(void) {
 
     /* ---- 8. MiniWin's own disk cannot be read ---- */
     reset_all(); add_disk(0, 4096, "RUNNING"); add_disk(2, 8192, "TARGET"); fill_source(0, 0, 0); sentinel(2);
-    { u8 *m = sec(2, 0); memset(m, 0, 512); mbr_entry(m, 0, 0x80, 0x83, 2816, 4096); sign(m); }
+    { u8 *m = sec(2, 0); memset(m, 0, 512); mbr_entry(m, 0, 0x80, 0x83, 2944, 4096); sign(m); }
     { u8 before[512]; memcpy(before, sec(2, 0), 512);
       st_resolve("ide300", &t); inj_read_fail_dev = 0; inj_read_fail_lba = 500;
       inst_begin(&t, 0); CHECK(run_job() == INST_PHASE_FAILED && inst.err == INST_ERR_READ_SOURCE && inst.err_lba == 500, "source read error: err %d sector %u", inst.err, inst.err_lba);
@@ -303,7 +303,7 @@ static void test_install(void) {
 
     /* ---- 10. probing the target for the confirmation prompt ---- */
     reset_all(); add_disk(0, 4096, "RUNNING"); add_disk(2, 16384, "TARGET"); fill_source(0, 0, 0);
-    { u8 *m = sec(2, 0); mbr_entry(m, 0, 0x80, 0x83, 2816, 4096); mbr_entry(m, 1, 0, 0x83, 8192, 4096); sign(m);
+    { u8 *m = sec(2, 0); mbr_entry(m, 0, 0x80, 0x83, 2944, 4096); mbr_entry(m, 1, 0, 0x83, 8192, 4096); sign(m);
       memset(sec(2, 8192), 0, 512); }
     { inst_probe_t pr; st_resolve("ide300", &t); inst_probe(&t, &pr);
       CHECK(pr.readable && pr.non_empty && pr.has_mbr_sig && pr.partitions == 2 && !pr.miniwin, "whole-device probe: has a partition table with %d partitions to destroy", pr.partitions);
@@ -354,7 +354,7 @@ int main(void) {
     /* ---------------- MBR partitions ---------------- */
     reset_all(); add_disk(0, 8192, "BOOT"); add_disk(2, 16384, "TARGET");
     { u8 *m = sec(2, 0);
-      mbr_entry(m, 0, 0x80, 0x83, 2816, 4096);
+      mbr_entry(m, 0, 0x80, 0x83, 2944, 4096);
       mbr_entry(m, 1, 0x00, 0x0C, 6144, 2048);
       mbr_entry(m, 2, 0x00, 0x05, 8192, 8000);                            /* extended container */
       sign(m);
@@ -364,7 +364,7 @@ int main(void) {
       u8 *e3 = sec(2, 8192 + 4800); mbr_entry(e3, 0, 0, 0x07, 64, 3000); sign(e3); }
     st_part_t p;
     CHECK(st_scheme(2) == ST_SCHEME_MBR, "scheme: MBR");
-    CHECK(st_get_partition(2, 1, &p) && p.start == 2816 && p.sectors == 4096 && p.active && p.type == 0x83 && !p.extended_container, "partition 1: start %u len %u active %d", p.start, p.sectors, p.active);
+    CHECK(st_get_partition(2, 1, &p) && p.start == 2944 && p.sectors == 4096 && p.active && p.type == 0x83 && !p.extended_container, "partition 1: start %u len %u active %d", p.start, p.sectors, p.active);
     CHECK(st_get_partition(2, 2, &p) && p.start == 6144 && p.sectors == 2048 && !p.active, "partition 2");
     CHECK(st_get_partition(2, 3, &p) && p.extended_container, "partition 3 is flagged as an extended container");
     CHECK(!st_get_partition(2, 4, &p), "partition 4 is empty");
@@ -404,12 +404,12 @@ int main(void) {
 
     /* ---------------- resolve ---------------- */
     reset_all(); add_disk(0, 8192, "BOOT"); add_disk(1, 3000, "SMALL"); add_disk(2, 16384, "TARGET");
-    { u8 *m = sec(2, 0); mbr_entry(m, 0, 0x80, 0x83, 2816, 4096); mbr_entry(m, 1, 0, 0x83, 6144, 1000); mbr_entry(m, 2, 0, 0x05, 8192, 8000);
+    { u8 *m = sec(2, 0); mbr_entry(m, 0, 0x80, 0x83, 2944, 4096); mbr_entry(m, 1, 0, 0x83, 6144, 1000); mbr_entry(m, 2, 0, 0x05, 8192, 8000);
       mbr_entry(m, 3, 0, 0x83, 16000, 4000); sign(m);                      /* entry 4 runs past the end of the device */
       u8 *e1 = sec(2, 8192); mbr_entry(e1, 0, 0, 0x83, 64, 3000); sign(e1); }
-    { u8 *m = sec(0, 0); mbr_entry(m, 0, 0x80, 0x83, 2816, 4096); sign(m); }   /* the boot disk has a partition table of its own */
+    { u8 *m = sec(0, 0); mbr_entry(m, 0, 0x80, 0x83, 2944, 4096); sign(m); }   /* the boot disk has a partition table of its own */
     st_target_t t;
-    CHECK(st_resolve("ide301", &t) == ST_OK && t.pos == 2 && t.base == 2816 && t.sectors == 4096 && !t.whole && strcmp(t.id, "ide301") == 0, "resolve ide301: pos %d base %u sectors %u", t.pos, t.base, t.sectors);
+    CHECK(st_resolve("ide301", &t) == ST_OK && t.pos == 2 && t.base == 2944 && t.sectors == 4096 && !t.whole && strcmp(t.id, "ide301") == 0, "resolve ide301: pos %d base %u sectors %u", t.pos, t.base, t.sectors);
     CHECK(st_resolve("IDE300", &t) == ST_OK && t.whole && t.base == 0 && t.sectors == 16384, "resolve IDE300 (whole device, upper case)");
     CHECK(st_resolve("ide305", &t) == ST_OK && t.base == 8192 + 64 && t.sectors == 3000, "resolve a logical partition: base %u", t.base);
     CHECK(st_resolve("ide302", &t) == ST_E_TOO_SMALL, "a 1000-sector partition is too small for a 2048-sector installation");
@@ -430,7 +430,7 @@ int main(void) {
     blk_boot_dev = 0; blk_boot_base = 0;
     CHECK(st_resolve("ide100", &t) == ST_E_OVERLAP_BOOT, "the whole boot disk overlaps the running installation");
     CHECK(st_resolve("ide101", &t) == ST_OK, "...but a partition that starts after the running installation is fine");
-    blk_boot_base = 2816;                                                     /* running from inside partition 1 of ide1 */
+    blk_boot_base = 2944;                                                     /* running from inside partition 1 of ide1 */
     CHECK(st_resolve("ide101", &t) == ST_E_OVERLAP_BOOT, "the partition MiniWin runs from is refused");
     CHECK(st_resolve("ide100", &t) == ST_E_OVERLAP_BOOT, "so is the whole disk that contains it");
     CHECK(st_resolve("ide300", &t) == ST_OK, "another disk is fine");

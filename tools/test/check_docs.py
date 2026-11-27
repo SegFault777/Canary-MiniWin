@@ -14,7 +14,7 @@ for f in files:
     if ext not in ('md', 'h', 'c', 'asm', 'py', 'sh'): continue
     try: s = open(f, encoding='utf-8').read()
     except Exception: continue
-    if ext == 'md' and (f == 'README.md' or f.startswith('docs/')):
+    if ext == 'md' and (f in ('README.md', 'README_ko.md') or f.startswith('docs/')):
         for m in re.finditer(r'\]\(([^)\s]+)\)', s):
             t = m.group(1).split('#')[0]
             if not t or re.match(r'^[a-z]+:', t) or t == '../../releases': continue     # (a GitHub-relative link to the Releases page)

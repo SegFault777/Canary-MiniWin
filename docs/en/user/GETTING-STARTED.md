@@ -17,7 +17,7 @@ your daily work.
 ```sh
 git clone https://github.com/SegFault777/MiniWin.git
 cd MiniWin
-./build.sh                  # builds the kernel and the 1344 KB disk image: build/os-image.img
+./build.sh                  # builds the kernel and the 1440 KB disk image: build/os-image.img
 tools/install_all.sh        # puts the icon pack and the demo programs (GREETER and the SDK examples) on it (always run this after build.sh)
                             # add --no-demos (or MW_NO_DEMOS=1) to leave the demos out: the icons only, /progs empty
 qemu-system-i386 -drive format=raw,file=build/os-image.img

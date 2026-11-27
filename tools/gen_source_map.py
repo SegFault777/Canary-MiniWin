@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-"""Generates docs/dev/SOURCE-MAP.md: one line per source file (boot loader, kernel headers, programs, tools), taken from the first
+"""Generates docs/en/dev/SOURCE-MAP.md: one line per source file (boot loader, kernel headers, programs, tools), taken from the first
 sentence of the file's own header comment -- so the map can never drift from what the files say about themselves.
 
-    tools/gen_source_map.py            rewrite docs/dev/SOURCE-MAP.md
+    tools/gen_source_map.py            rewrite docs/en/dev/SOURCE-MAP.md
     tools/gen_source_map.py --check    exit 1 if it is out of date (tools/test/check_docs.py runs this)"""
 import os, re, subprocess, sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-OUT = os.path.join(ROOT, 'docs', 'dev', 'SOURCE-MAP.md')
+OUT = os.path.join(ROOT, 'docs', 'en', 'dev', 'SOURCE-MAP.md')
 os.chdir(ROOT)
 
 def first_sentence(path):
@@ -68,7 +68,7 @@ for title, folder, exts in groups:
 text = '\n'.join(out)
 if '--check' in sys.argv:
     cur = open(OUT).read() if os.path.exists(OUT) else ''
-    if cur != text: sys.exit('docs/dev/SOURCE-MAP.md is out of date -- run tools/gen_source_map.py')
+    if cur != text: sys.exit('docs/en/dev/SOURCE-MAP.md is out of date -- run tools/gen_source_map.py')
     print('SOURCE-MAP.md up to date')
 else:
     open(OUT, 'w').write(text)

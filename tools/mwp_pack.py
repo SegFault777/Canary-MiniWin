@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
 """mwp_pack.py -- append the optional metadata trailer to a .mwp: the program's own icon (16x16 and 32x32), a title, and the
-oldest ABI version it needs.   (1.1-alpha-11; layout documented in sdk/README.md and docs/dev/MWP-PROGRAMS.md)
+oldest ABI version it needs.   (1.1-alpha-11; layout documented in sdk/README.md and docs/en/dev/MWP-PROGRAMS.md)
 
     tools/mwp_pack.py in.mwp out.mwp [--icon icon.png] [--title "MiniCalc"] [--abi 3]
 

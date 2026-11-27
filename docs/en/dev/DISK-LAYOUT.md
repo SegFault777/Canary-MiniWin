@@ -5,7 +5,7 @@
 
 One MiniWin installation is laid out like this. Every LBA below is **relative to the installation's base**: 0 for an image
 or a whole-disk install, the partition's first sector for an installation inside a partition (`ata_read_sector()` adds the
-base, see [BOOT-PROCESS.md](BOOT-PROCESS.md)). The stock image is exactly **2688 sectors (1344 KB)**.
+base, see [BOOT-PROCESS.md](BOOT-PROCESS.md)). The stock image is exactly **2880 sectors (1440 KB)**, one 1.44 MB floppy.
 
 | LBA | what |
 |---|---|
@@ -14,7 +14,7 @@ base, see [BOOT-PROCESS.md](BOOT-PROCESS.md)). The stock image is exactly **2688
 | 5-1028 | the kernel (budget 512 KB = 1024 sectors) |
 | 1029-1732 | the icon catalog: 64 slots x 11 sectors (1 header + 32x32 + 16x16 bitmaps; written offline by `tools/install_icons.py`, never by the running OS) |
 | 1733-2372 | the **font pack** (`MW_FONT_LBA`, 640 sectors): the glyph tables of the faces the OS can draw with, see [FONTS.md](FONTS.md) |
-| 2373-2687 | the **root volume**, `/`: an MWFS of 315 sectors in the stock image (`MW_ROOTFS_LBA`, `MW_ROOTFS_STOCK_SECTORS`) |
+| 2373-2879 | the **root volume**, `/`: an MWFS of 507 sectors in the stock image (`MW_ROOTFS_LBA`, `MW_ROOTFS_STOCK_SECTORS`) |
 
 `os-inst` copies LBA 0-2372 (patching the boot sector's install fields) and **formats** a fresh root volume that fills the rest
 of the target partition or disk, up to 8 GB; see [INSTALLING.md](../user/INSTALLING.md). `build.sh` fails if the kernel's

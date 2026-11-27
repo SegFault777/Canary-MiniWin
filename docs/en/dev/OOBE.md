@@ -44,9 +44,9 @@ settings.
 The stock image has a `SYSTEM.CFG`, so the test scripts boot straight to the desktop. To see the setup, make a copy whose root volume has none -- `tools/test/mk_oobe_image.sh /tmp/x.img` does exactly this:
 
     cp build/os-image.img /tmp/x.img
-    python3 tools/mwfs.py format /tmp/x.img --lba 2373 --sectors 315 --label MINIWIN
-    python3 tools/mwfs.py put /tmp/x.img LICENSE --lba 2373 --sectors 315 --path /etc/LICENSE.TXT
-    python3 tools/mwfs.py put /tmp/x.img LICENSE.ko.txt --lba 2373 --sectors 315 --path /etc/LICENSE_KO.TXT
+    python3 tools/mwfs.py format /tmp/x.img --lba 2373 --sectors 507 --label MINIWIN
+    python3 tools/mwfs.py put /tmp/x.img LICENSE --lba 2373 --sectors 507 --path /etc/LICENSE.TXT
+    python3 tools/mwfs.py put /tmp/x.img LICENSE.ko.txt --lba 2373 --sectors 507 --path /etc/LICENSE_KO.TXT
 
 (then `IMG=/tmp/x.img tools/test/qemu_plain.sh ...`; in 640x480 Next is at (580,460), Back at (486,460)). `tools/test/qemu_osinst.sh` checks the real path: an
 installed disk has both licence texts and no `SYSTEM.CFG`, and its first boot shows the setup's white page.

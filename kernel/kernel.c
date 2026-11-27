@@ -3,7 +3,7 @@
  *
  * The whole kernel is ONE translation unit (every module is a header of `static` code), so the order of the
  * includes below IS the dependency order: a module may use anything included above it and nothing below.
- * That order is the architecture; docs/dev/ARCHITECTURE.md explains each layer and the rules between them.
+ * That order is the architecture; docs/en/dev/ARCHITECTURE.md explains each layer and the rules between them.
  *
  *   hardware & protocols   io vga font keyboard mouse ata storage fs os_inst speaker rtc serial pci  nic rtl8139 e1000
  *   (flat headers in       net arp ip icmp udp dns dhcp tcp tls http https           net_stack mwp

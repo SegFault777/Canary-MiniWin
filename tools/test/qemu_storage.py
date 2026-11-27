@@ -53,7 +53,7 @@ log = qemu(["-drive", "file=%s,format=raw" % IMG], 10)
 check("IDE master boot", "LBA 0 on ide1" in boot_line(log), boot_line(log))
 
 log = qemu(["-device", "ich9-ahci,id=ahci"] + ahci(IMG, 0, True), 10)
-check("AHCI: the kernel lists the disk", "[AHCI] sata1 = port 0, 2688 sectors" in log)
+check("AHCI: the kernel lists the disk", "[AHCI] sata1 = port 0, 2880 sectors" in log)
 check("AHCI: ...and finds its own boot disk", "LBA 0 on sata1" in boot_line(log), boot_line(log))
 
 cmds = ["wait 14", "move 50 202", "click", "click", "wait 2", "move 300 307", "click", "type mw-test-pw", "key ret", "type mw-test-pw", "key ret", "wait 1", "type os-inst list", "key ret", "wait 2",
@@ -83,7 +83,7 @@ def scsi(img, ident, boot=False):
 MPT = ["-device", "mptsas1068,id=scsi0"]
 
 log = qemu(MPT + scsi(IMG, 0, True), 12)
-check("SCSI: the kernel lists the disk", "[MPT] scsi1 = controller 0, target 0, 2688 sectors, QEMU QEMU HARDDISK" in log, log[-300:])
+check("SCSI: the kernel lists the disk", "[MPT] scsi1 = controller 0, target 0, 2880 sectors, QEMU QEMU HARDDISK" in log, log[-300:])
 check("SCSI: ...and finds its own boot disk", "LBA 0 on scsi1" in boot_line(log), boot_line(log))
 
 if os.path.exists(DISK2): os.remove(DISK2)
@@ -128,7 +128,7 @@ changed = sorted({i // 512 for i in range(len(before)) if before[i] != after[i]}
 sys.path.insert(0, "tools")
 import mwfs
 try:
-    fv = mwfs.Vol(FLOPPY, 2373, 315); fv.open()
+    fv = mwfs.Vol(FLOPPY, 2373, 507); fv.open()
     docs = [n for n, _, _ in fv.entries(fv.walk("/home/docs"))]
 except Exception as e:
     docs = ["error: %s" % e]
@@ -142,7 +142,7 @@ def nvme(img, n, boot=False):
 if os.path.exists(DISK2): os.remove(DISK2)
 subprocess.check_call(["truncate", "-s", "8M", DISK2])
 log = qemu(nvme(IMG, 0, True), 12)
-check("NVMe: the kernel lists the SSD", "[NVMe] nvme1 = controller 0, namespace 1, 2688 sectors" in log, log[-300:])
+check("NVMe: the kernel lists the SSD", "[NVMe] nvme1 = controller 0, namespace 1, 2880 sectors" in log, log[-300:])
 check("NVMe: ...and finds its own boot disk", "LBA 0 on nvme1" in boot_line(log), boot_line(log))
 
 cmds = ["wait 14", "move 50 202", "click", "click", "wait 2", "move 300 307", "click", "type mw-test-pw", "key ret", "type mw-test-pw", "key ret", "wait 1", "type os-inst list", "key ret", "wait 2",
