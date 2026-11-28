@@ -1,12 +1,13 @@
 # Roadmap and known limits
 
-## Where 1.1-alpha-9 stands
+## Where 1.1-alpha-14 stands
 
-Since alpha-8: a **real file system** (MWFS: directories, `/` and `/mnt/<id>`, unlimited documents and programs, crash-safe by
-construction, `part` to format/mount/check/edit partitions); **USB** keyboards, mice (wheel) and tablets on xHCI, EHCI and OHCI;
-`os-inst <id> <arch>`; a MiniShell prompt that shows the current directory and Unix/Windows-style commands; **menu bars** in MiniShell,
-MiniWeb and MiniFiles; scroll bars you can drag and the mouse wheel, also in Notepad and MiniShell; the apps renamed **MINIWEB** and
-**MINISHELL**. See [CHANGELOG.md](CHANGELOG.md).
+Since alpha-13 (the live ISO, the INSTALL window, the Control Panel): **ring 3** (programs built with `--ring3` run in protected user mode) and **paging**
+for them; a **JavaScript**, **CSS3** and **HTML5** engine in MiniWeb, **TLS 1.3** and **HTTP/3 over QUIC**; a **first-run setup and a logon** with
+passwords, and a Unix-like directory tree whose system folders only `root` can change; **TrueType fonts** you can install, a **font pack**, kerning and sizes
+7 to 14; **Display Properties** (320x200, 640x480, 854x480); Date/Time and Mouse property sheets, **right-click menus**, a Windows 95 style **task bar**,
+a Start menu with folders; **dialogs that are windows**; **SDK 3.0** (a 60 KB program limit, a heap and more in `mw_libc.h`, Tetris and Minesweeper as examples);
+a stock image of exactly 1440 KB; the docs in `docs/en/` and `docs/ko/`. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Known limits
 
@@ -29,7 +30,7 @@ MiniWeb and MiniFiles; scroll bars you can drag and the mouse wheel, also in Not
   of `/home/docs` and `/progs`. Notepad's menu bar is its own older code, not the shared widget.
 * **A resolved ARP entry never expires**; the file system assumes a drive writes one sector atomically and in order.
 * **TLS.** TLS 1.3 (x25519, P-256 and P-384 key shares via HelloRetryRequest; AES-128/256-GCM; RSA-PSS and ECDSA certificates) and TLS 1.2. No session resumption or 0-RTT, no revocation checking, no name constraints (certificates that make either critical are refused). **HTTP/3 over QUIC v1** (`quic.h`, `h3.h`: AES-128-GCM, QPACK without a dynamic table, loss recovery by PTO; no Retry / Version Negotiation / 0-RTT / migration / congestion control -- see the changelog).
-* **Ring 3.** Everything runs in ring 0, with no memory protection (now planned for alpha-14).
+* **Ring 3.** Only programs built with `--ring3` run in ring 3 (alpha-14); the apps inside the kernel (Notepad, Setting, MiniWeb, ...) still run in ring 0, and there is no process protection yet (alpha-15).
 
 ## The kernel size budget
 
@@ -44,7 +45,7 @@ same way (`tools/gen_hangul_font.py` has the compressor), moving `.bss` tables t
 * **1.1-alpha-12** (done, see the [changelog](CHANGELOG.md)): MiniShell that follows its window, horizontal scroll bars, the disks in
   `/mnt`, nine Settings pages, kerning.
 * **1.1-alpha-13** (done): the live ISO, the INSTALL window, the minimal `.img` and the full `.iso`, the Control Panel, the new icons.
-* **1.1-alpha-14**: **ring 3**, **more paging**, **JavaScript in part (a little)**, **CSS3 (most of it)** and **HTML5 (most of it)**.
+* **1.1-alpha-14** (in progress, see the [changelog](CHANGELOG.md)): **ring 3**, **more paging**, **JavaScript in part (a little)**, **CSS3 (most of it)** and **HTML5 (most of it)**.
 * **1.1-alpha-15**: **process protection**, **memory management**, **a kernel that behaves like a real OS kernel**, and **USB flash
   drives** (mass storage over the existing OHCI/EHCI/xHCI stack).
 * **1.1-alpha-16**: the source tree changes shape: modules written as headers (like `css.h`) become directories of `.c` files
